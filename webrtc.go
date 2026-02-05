@@ -131,7 +131,11 @@ func newSession(sessionConfig SessionConfig) (*Session, error) {
 		}
 	})
 
-	session.VideoTrack, err = webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264}, "video", "kvm")
+	if streamEncodecType == "hevc" {
+		session.VideoTrack, err = webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH265}, "video", "kvm")
+	} else {
+		session.VideoTrack, err = webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264}, "video", "kvm")
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -191,6 +195,7 @@ func newSession(sessionConfig SessionConfig) (*Session, error) {
 				isConnected = true
 				actionSessions++
 				onActiveSessionsChanged()
+				setNpuAppStatus()
 				if actionSessions == 1 {
 					onFirstSessionConnected()
 				}

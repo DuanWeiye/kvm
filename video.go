@@ -54,3 +54,8 @@ func setForceHpd() error {
 	err := rpcSetForceHpd(config.ForceHpd)
 	return err
 }
+
+func setNpuAppStatus() error {
+	err := rpcSetNpuAppStatus(config.NpuAppEnabled)
+	return err
+}

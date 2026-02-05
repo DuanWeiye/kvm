@@ -132,12 +132,14 @@ func StartVideoSocketServer(socketPath string, handleClient func(net.Conn), isCt
 
 	go func() {
 		for {
+			scopedLogger.Debug().Msg("waiting for client connection")
 			conn, err := listener.Accept()
 
 			if err != nil {
 				scopedLogger.Warn().Err(err).Msg("failed to accept socket")
 				continue
 			}
+			scopedLogger.Info().Str("remote_addr", conn.RemoteAddr().String()).Msg("new client connection accepted")
 			if isCtrl {
 				// check if the channel is closed
 				select {
@@ -238,6 +240,12 @@ func handleVideoClient(conn net.Conn) {
 		now := time.Now()
 		sinceLastFrame := now.Sub(lastFrame)
 		lastFrame = now
+
+		// Broadcast to HTTP clients
+		dataCopy := make([]byte, n)
+		copy(dataCopy, inboundPacket[:n])
+		videoBroadcaster.Broadcast(dataCopy)
+
 		if currentSession != nil {
 			err := currentSession.VideoTrack.WriteSample(media.Sample{Data: inboundPacket[:n], Duration: sinceLastFrame})
 			if err != nil {

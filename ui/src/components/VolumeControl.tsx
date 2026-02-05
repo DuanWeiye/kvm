@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { LuVolume2, LuVolumeX } from "react-icons/lu";
 import clsx from "clsx";
+import { Slider } from "antd";
+import { createStyles } from 'antd-style';
+import { isMobile } from "react-device-detect";
+
 import { cva, cx } from "@/cva.config";
+import { button_primary_color, dark_bd_style } from "@/layout/theme_color";
 
 interface VolumeControlProps {
   theme?: "primary" | "danger" | "light" | "lightDanger" | "blank";
@@ -67,27 +72,6 @@ const themes = {
   ),
 };
 
-const btnVariants = cva({
-  base: cx(
-    // Base styles
-    "border rounded-sm select-none",
-    // Size classes
-    "justify-center items-center shrink-0",
-    // Transition classes
-    "outline-hidden transition-all duration-200",
-    // Text classes
-    "font-display text-center font-medium leading-tight",
-    // States
-    "group-focus:outline-hidden group-focus:ring-2 group-focus:ring-offset-2 group-focus:ring-blue-700",
-    "group-disabled:opacity-50 group-disabled:pointer-events-none",
-  ),
-
-  variants: {
-    size: sizes,
-    theme: themes,
-  },
-});
-
 const iconVariants = cva({
   variants: {
     size: {
@@ -107,24 +91,43 @@ const iconVariants = cva({
   },
 });
 
+const useStyles = createStyles(({ css }) => ({
+  myCustomSlider: css`
+    .ant-slider-handle:hover::after,
+    .ant-slider-handle:hover::before,
+    .ant-slider-handle:active::after,
+    .ant-slider-handle:focus::after,
+    .ant-slider-handle::after {
+      width: 14px;
+      height: 14px;
+      inset-inline-start: 0;
+      inset-block-start: 0;
+      outline: none;
+      box-shadow: none;
+      border-radius: 50%;
+      margin-top: -2px;
+    }
+  `,
+}));
+
 const VolumeControl: React.FC<VolumeControlProps> = ({
-  theme = "light",
-  size = "XS",
-  fullWidth = false,
-  className,
-}) => {
+                                                       theme = "light",
+                                                       size = "XS",
+                                                       fullWidth = false,
+                                                       className,
+                                                     }) => {
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(true);
-  const [showSlider, setShowSlider] = useState(false);
+  // const [showSlider, setShowSlider] = useState(false);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
-
+  const { styles } = useStyles();
   useEffect(() => {
     const audio = document.querySelector("audio#global-audio") as HTMLAudioElement | null;
     setAudioElement(audio);
     if (audio) {
       const savedVolume = parseFloat(localStorage.getItem("audioVolume") || "1");
       const savedMuted = localStorage.getItem("audioMuted") === "true";
-      
+
       audio.volume = savedVolume;
       audio.muted = savedMuted;
       setVolume(savedVolume);
@@ -149,8 +152,8 @@ const VolumeControl: React.FC<VolumeControlProps> = ({
     setMuted(false);
   };
 
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newVolume = parseFloat(e.target.value);
+  const handleVolumeChange = (newVolume: number) => {
+    // const newVolume = parseFloat(e.target.value);
     setVolume(newVolume);
     setMuted(newVolume === 0);
     if (audioElement) {
@@ -162,45 +165,43 @@ const VolumeControl: React.FC<VolumeControlProps> = ({
   };
 
   const iconClass = iconVariants({ theme, size });
-  const btnClass = btnVariants({ theme, size });
 
   return (
     <div
       className={clsx(
-        "relative group flex items-center gap-2",
+        "relative group flex items-center",
         fullWidth ? "w-full" : "w-fit",
         className
       )}
-      onMouseEnter={() => setShowSlider(true)}
-      onMouseLeave={() => setShowSlider(false)}
     >
-      <button
+      <div
         onClick={handlePlay}
-        className={clsx("group p-2 flex items-center", btnClass)}
-        aria-label="Unmute & Play"
       >
         {muted || volume === 0 ? (
           <LuVolumeX className={clsx(iconClass, "shrink-0")} />
         ) : (
           <LuVolume2 className={clsx(iconClass, "shrink-0")} />
         )}
-      </button>
+      </div>
 
       <div
         className={clsx(
-          "transition-all duration-300 ease-in-out",
-          showSlider ? "w-16 opacity-100 ml-2" : "w-0 opacity-0"
+          "transition-all duration-300 ease-in-out ",
+          "flex-1 opacity-100 ml-2 px-2"
         )}
       >
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
+        <Slider
+          min={0}
+          max={1}
+          step={0.01}
           value={muted ? 0 : volume}
           onChange={handleVolumeChange}
-          className="w-16 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-          aria-label="Volume slider"
+          className={`${styles.myCustomSlider} h-full !m-0 ${isMobile ? "w-full" : "w-[100px]"}`}
+          classNames={{
+            rail: `${dark_bd_style} !rounded-md`,
+            track:`${button_primary_color} !rounded-md`,
+            handle: `${button_primary_color} rounded-full`,
+          }}
         />
       </div>
     </div>

@@ -3,12 +3,15 @@ package kvm
 import (
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"kvm/internal/usbgadget"
 )
 
 var gadget *usbgadget.UsbGadget
+var reinitLock sync.Mutex
+var isReinitializing bool
 
 // initUsbGadget initializes the USB gadget.
 // call it only after the config is loaded.
@@ -57,6 +60,13 @@ func initUsbGadget() {
 				"error":  err.Error(),
 			}, currentSession)
 		}
+
+		go func() {
+			usbLogger.Info().Str("device", device).Msg("Attempting to reinitialize USB gadget due to missing HID device")
+			if err := rpcReinitializeUsbGadget(); err != nil {
+				usbLogger.Error().Err(err).Msg("Failed to auto-reinitialize USB gadget")
+			}
+		}()
 	})
 
 	// open the keyboard hid file to listen for keyboard events
@@ -155,6 +165,21 @@ func rpcSendUsbWakeupSignal() error {
 
 // rpcReinitializeUsbGadget reinitializes the USB gadget
 func rpcReinitializeUsbGadget() error {
+	reinitLock.Lock()
+	if isReinitializing {
+		reinitLock.Unlock()
+		usbLogger.Warn().Msg("USB gadget reinitialization already in progress, skipping")
+		return nil
+	}
+	isReinitializing = true
+	reinitLock.Unlock()
+
+	defer func() {
+		reinitLock.Lock()
+		isReinitializing = false
+		reinitLock.Unlock()
+	}()
+
 	usbLogger.Info().Msg("reinitializing USB gadget (hard)")
 
 	if gadget == nil {
@@ -195,6 +220,13 @@ func rpcReinitializeUsbGadget() error {
 				"error":  err.Error(),
 			}, currentSession)
 		}
+
+		go func() {
+			usbLogger.Info().Str("device", device).Msg("Attempting to reinitialize USB gadget due to missing HID device")
+			if err := rpcReinitializeUsbGadget(); err != nil {
+				usbLogger.Error().Err(err).Msg("Failed to auto-reinitialize USB gadget")
+			}
+		}()
 	})
 
 	// Reopen keyboard HID file

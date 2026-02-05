@@ -762,6 +762,126 @@ func rpcGetVntStatus() (VntStatus, error) {
 	return VntStatus{Running: vntRunning()}, nil
 }
 
+type WireguardStatus struct {
+	Running bool `json:"running"`
+}
+
+var (
+	wireguardLogPath  = "/tmp/wireguard.log"
+	wireguardConfPath = "/etc/wireguard/wg0.conf"
+)
+
+func wireguardRunning() bool {
+	cmd := exec.Command("ip", "link", "show", "wg0")
+	return cmd.Run() == nil
+}
+
+func rpcGetWireguardLog() (string, error) {
+	f, err := os.Open(wireguardLogPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("wireguard log file not exist")
+		}
+		return "", err
+	}
+	defer f.Close()
+
+	const want = 30
+	lines := make([]string, 0, want+10)
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		lines = append(lines, sc.Text())
+		if len(lines) > want {
+			lines = lines[1:]
+		}
+	}
+	if err := sc.Err(); err != nil {
+		return "", err
+	}
+
+	var buf []byte
+	for _, l := range lines {
+		buf = append(buf, l...)
+		buf = append(buf, '\n')
+	}
+	return string(buf), nil
+}
+
+func rpcGetWireguardConfig() (WireguardConfig, error) {
+	return config.WireguardConfig, nil
+}
+
+func rpcStartWireguard(configFile string) error {
+	if wireguardRunning() {
+		_ = exec.Command("wg-quick", "down", wireguardConfPath).Run()
+	}
+
+	if configFile == "" {
+		return fmt.Errorf("wireguard config file is required")
+	}
+
+	_ = os.MkdirAll(filepath.Dir(wireguardConfPath), 0700)
+	if err := os.WriteFile(wireguardConfPath, []byte(configFile), 0600); err != nil {
+		return fmt.Errorf("failed to write wireguard config file: %w", err)
+	}
+
+	cmd := exec.Command("wg-quick", "up", wireguardConfPath)
+	logFile, err := os.OpenFile(wireguardLogPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open wireguard log file: %w", err)
+	}
+	defer logFile.Close()
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("start wireguard failed: %w", err)
+	}
+
+	config.WireguardAutoStart = true
+	config.WireguardConfig.ConfigFile = configFile
+	if err := SaveConfig(); err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
+	}
+
+	return nil
+}
+
+func rpcStopWireguard() error {
+	if wireguardRunning() {
+		cmd := exec.Command("wg-quick", "down", wireguardConfPath)
+		logFile, err := os.OpenFile(wireguardLogPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+		if err == nil {
+			defer logFile.Close()
+			cmd.Stdout = logFile
+			cmd.Stderr = logFile
+		}
+
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("failed to stop wireguard: %w", err)
+		}
+	}
+
+	config.WireguardAutoStart = false
+	if err := SaveConfig(); err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
+	}
+	return nil
+}
+
+func rpcGetWireguardStatus() (WireguardStatus, error) {
+	return WireguardStatus{Running: wireguardRunning()}, nil
+}
+
+func rpcGetWireguardInfo() (string, error) {
+	cmd := exec.Command("wg", "show")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to get wireguard info: %w", err)
+	}
+	return string(output), nil
+}
+
 func initVPN() {
 	waitVpnCtrlClientConnected()
 	go func() {
@@ -817,6 +937,11 @@ func initVPN() {
 			}
 		}
 
+		if config.WireguardAutoStart && config.WireguardConfig.ConfigFile != "" {
+			if err := rpcStartWireguard(config.WireguardConfig.ConfigFile); err != nil {
+				vpnLogger.Error().Err(err).Msg("Failed to auto start wireguard")
+			}
+		}
 	}()
 
 	go func() {

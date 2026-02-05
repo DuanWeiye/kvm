@@ -15,11 +15,11 @@ interface KeyInfo { key: string | number; shift?: boolean, altRight?: boolean }
 export type KeyCombo = KeyInfo & { deadKey?: boolean, accentKey?: KeyInfo }
 
 export const layouts: Record<string, string> = {
-  be_FR: name_fr_BE,
-  cs_CZ: name_cs_CZ,
   en_UK: name_en_UK,
   en_US: name_en_US,
   fr_FR: name_fr_FR,
+  be_FR: name_fr_BE,
+  cs_CZ: name_cs_CZ,
   de_DE: name_de_DE,
   it_IT: name_it_IT,
   nb_NO: name_nb_NO,

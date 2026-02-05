@@ -1,7 +1,7 @@
 import { useCallback } from "react";
-import notifications from "@/notifications";
 
-import { useHidStore, useRTCStore } from "@/hooks/stores";
+import notifications from "@/notifications";
+import { useHidStore, useRTCStore, useSettingsStore } from "@/hooks/stores";
 import { useJsonRpc } from "@/hooks/useJsonRpc";
 import { keys, modifiers } from "@/keyboardMappings";
 
@@ -9,6 +9,7 @@ export default function useKeyboard() {
   const [send] = useJsonRpc();
 
   const rpcDataChannel = useRTCStore(state => state.rpcDataChannel);
+  const forceHttp = useSettingsStore(state => state.forceHttp);
   const updateActiveKeysAndModifiers = useHidStore(
     state => state.updateActiveKeysAndModifiers,
   );
@@ -17,11 +18,10 @@ export default function useKeyboard() {
 
   const sendKeyboardEvent = useCallback(
     (keys: number[], modifiers: number[]) => {
-      if (rpcDataChannel?.readyState !== "open") return;
+      if (!forceHttp && rpcDataChannel?.readyState !== "open") return;
       // Don't send keyboard events while reinitializing gadget
       if (isReinitializingGadget) return;
       if (usbState !== "configured") return;
-      
       const accModifier = modifiers.reduce((acc, val) => acc + val, 0);
 
       send("keyboardReport", { keys, modifier: accModifier }, resp => {
@@ -36,7 +36,7 @@ export default function useKeyboard() {
       // We do this for the info bar to display the currently pressed keys for the user
       updateActiveKeysAndModifiers({ keys: keys, modifiers: modifiers });
     },
-    [rpcDataChannel?.readyState, send, updateActiveKeysAndModifiers, isReinitializingGadget, usbState],
+    [forceHttp, rpcDataChannel?.readyState, send, updateActiveKeysAndModifiers, isReinitializingGadget, usbState],
   );
 
   const resetKeyboardState = useCallback(() => {

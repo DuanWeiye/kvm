@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
+	"time"
 )
 
 const (
@@ -109,11 +111,62 @@ func setLedMode(ledConfigPath string, mode string) error {
 	return nil
 }
 
+func pulseGPIO(pin int, duration time.Duration) error {
+	// First pull up
+	if err := setGPIOValue(pin, true); err != nil {
+		return err
+	}
+
+	// Wait for duration
+	time.Sleep(duration)
+
+	// Then pull down
+	if err := setGPIOValue(pin, false); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func getGPIOValue(pin int) (bool, error) {
+	if !isGPIOExported(pin) {
+		if err := exportGPIO(pin); err != nil {
+			return false, fmt.Errorf("failed to export GPIO: %v", err)
+		}
+		if err := setGPIODirection(pin, "in"); err != nil {
+			return false, fmt.Errorf("failed to set GPIO direction: %v", err)
+		}
+	}
+	valueFile := fmt.Sprintf("%s/gpio%d/value", gpioBasePath, pin)
+	data, err := os.ReadFile(valueFile)
+	if err != nil {
+		return false, fmt.Errorf("failed to read GPIO value: %v", err)
+	}
+	value := strings.TrimSpace(string(data))
+	return value == "1", nil
+}
+
+func resetIOInput() error {
+	// Reset IO2 (GPIO0) and IO3 (GPIO1) to input mode
+	if err := setGPIODirection(0, "in"); err != nil {
+		return fmt.Errorf("failed to reset IO2: %v", err)
+	}
+	if err := setGPIODirection(1, "in"); err != nil {
+		return fmt.Errorf("failed to reset IO3: %v", err)
+	}
+	return nil
+}
+
 func initGPIO() {
 	LoadConfig()
 	// IO0: GPIO58 IO1: GPIO59
 	_ = setGPIOValue(58, config.IO0Status)
 	_ = setGPIOValue(59, config.IO1Status)
+
+	// IO2: GPIO0 IO3: GPIO1 - Input
+	_ = setGPIODirection(0, "in")
+	_ = setGPIODirection(1, "in")
+
 	_ = setLedMode(ledYellowPath, config.LEDYellowMode)
 	_ = setLedMode(ledGreenPath, config.LEDGreenMode)
 }

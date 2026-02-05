@@ -100,10 +100,10 @@ type Config struct {
 	DisplayOffAfterSec   int                    `json:"display_off_after_sec"`
 	TLSMode              string                 `json:"tls_mode"` // options: "self-signed", "user-defined", ""
 	UsbConfig            *usbgadget.Config      `json:"usb_config"`
-    UsbDevices           *usbgadget.Devices     `json:"usb_devices"`
-    NetworkConfig        *network.NetworkConfig `json:"network_config"`
-    AppliedNetworkConfig *network.NetworkConfig `json:"applied_network_config,omitempty"`
-    DefaultLogLevel      string                 `json:"default_log_level"`
+	UsbDevices           *usbgadget.Devices     `json:"usb_devices"`
+	NetworkConfig        *network.NetworkConfig `json:"network_config"`
+	AppliedNetworkConfig *network.NetworkConfig `json:"applied_network_config,omitempty"`
+	DefaultLogLevel      string                 `json:"default_log_level"`
 	TailScaleAutoStart   bool                   `json:"tailscale_autostart"`
 	TailScaleXEdge       bool                   `json:"tailscale_xedge"`
 	ZeroTierNetworkID    string                 `json:"zerotier_network_id"`
@@ -123,17 +123,25 @@ type Config struct {
 	EasytierConfig       EasytierConfig         `json:"easytier_config"`
 	VntAutoStart         bool                   `json:"vnt_autostart"`
 	VntConfig            VntConfig              `json:"vnt_config"`
+	WireguardAutoStart   bool                   `json:"wireguard_autostart"`
+	WireguardConfig      WireguardConfig        `json:"wireguard_config"`
+	NpuAppEnabled        bool                   `json:"npu_app_enabled"`
 }
 
 type VntConfig struct {
-    Token      string `json:"token"`
-    DeviceId   string `json:"device_id"`
-    Name       string `json:"name"`
-    ServerAddr string `json:"server_addr"`
-    ConfigMode string `json:"config_mode"` // "params" or "file"
-    ConfigFile string `json:"config_file"`
-    Model      string `json:"model"`
-    Password   string `json:"password"`
+	Token      string `json:"token"`
+	DeviceId   string `json:"device_id"`
+	Name       string `json:"name"`
+	ServerAddr string `json:"server_addr"`
+	ConfigMode string `json:"config_mode"` // "params" or "file"
+	ConfigFile string `json:"config_file"`
+	Model      string `json:"model"`
+	Password   string `json:"password"`
+}
+
+type WireguardConfig struct {
+	NetworkName string `json:"network_name"`
+	ConfigFile  string `json:"config_file"`
 }
 
 const configPath = "/userdata/kvm_config.json"
@@ -167,20 +175,22 @@ var defaultConfig = &Config{
 		Audio:         false, //At any given time, only one of Audio and Mtp can be set to true
 		Mtp:           false,
 	},
-    NetworkConfig:       &network.NetworkConfig{},
-    AppliedNetworkConfig: nil,
-	DefaultLogLevel:     "INFO",
-	ZeroTierAutoStart:   false,
-	TailScaleAutoStart:  false,
-	TailScaleXEdge:      false,
-	FrpcAutoStart:       false,
+	NetworkConfig:        &network.NetworkConfig{},
+	AppliedNetworkConfig: nil,
+	DefaultLogLevel:      "INFO",
+	ZeroTierAutoStart:    false,
+	TailScaleAutoStart:   false,
+	TailScaleXEdge:       false,
+	FrpcAutoStart:        false,
 	CloudflaredAutoStart: false,
-	IO0Status:           true,
-	IO1Status:           true,
-	AudioMode:           "disabled",
-	LEDGreenMode:        "network-rx",
-	LEDYellowMode:       "kernel-activity",
-	AutoMountSystemInfo: true,
+	IO0Status:            false,
+	IO1Status:            false,
+	AudioMode:            "disabled",
+	LEDGreenMode:         "network-rx",
+	LEDYellowMode:        "kernel-activity",
+	AutoMountSystemInfo:  true,
+	WireguardAutoStart:   false,
+	NpuAppEnabled:        false,
 }
 
 var (

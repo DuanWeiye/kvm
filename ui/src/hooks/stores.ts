@@ -38,7 +38,8 @@ const appendStatToMap = <T extends { timestamp: number }>(
 };
 
 // Constants and types
-export type AvailableSidebarViews = "connection-stats";
+export type AvailableSidebarViews ="ConsoleLogViewer"|"MacroMoreList"|"Fullscreen"|"TerminalTabsMobile"|"SettingsModal"|"ClipboardMobile"|"KeyboardPanel"|"MousePanel"|"SettingsVideo"
+  |"connection-stats"|"Clipboard"|"PowerControl"|"Macros"|"VirtualMedia"|"SharedFolders"|null;
 export type AvailableTerminalTypes = "kvm" | "serial" | "none";
 
 export interface User {
@@ -56,6 +57,11 @@ interface UIState {
   sidebarView: AvailableSidebarViews | null;
   setSidebarView: (view: AvailableSidebarViews | null) => void;
 
+  topBarView: AvailableSidebarViews | null;
+  setTopBarView: (view: AvailableSidebarViews | null) => void;
+  isAnimationComplete: boolean;
+  setIsAnimationComplete: (enabled: boolean) => void;
+
   disableVideoFocusTrap: boolean;
   setDisableVideoFocusTrap: (enabled: boolean) => void;
 
@@ -63,12 +69,15 @@ interface UIState {
   setWakeOnLanModalVisibility: (enabled: boolean) => void;
 
   toggleSidebarView: (view: AvailableSidebarViews) => void;
+  toggleTopBarView: (view: AvailableSidebarViews) => void;
 
   isAttachedVirtualKeyboardVisible: boolean;
   setAttachedVirtualKeyboardVisibility: (enabled: boolean) => void;
 
   terminalType: AvailableTerminalTypes;
   setTerminalType: (enabled: UIState["terminalType"]) => void;
+  otherSession:boolean;
+  setOtherSession: (enabled: boolean) => void;
 }
 
 export const useUiStore = create<UIState>(set => ({
@@ -77,9 +86,13 @@ export const useUiStore = create<UIState>(set => ({
 
   sidebarView: null,
   setSidebarView: view => set({ sidebarView: view }),
+  topBarView: null,
+  setTopBarView: view => set({ topBarView: view }),
 
   disableVideoFocusTrap: false,
   setDisableVideoFocusTrap: enabled => set({ disableVideoFocusTrap: enabled }),
+  isAnimationComplete: false,
+  setIsAnimationComplete: enabled => set({ isAnimationComplete: enabled }),
 
   isWakeOnLanModalVisible: false,
   setWakeOnLanModalVisibility: enabled => set({ isWakeOnLanModalVisible: enabled }),
@@ -87,16 +100,30 @@ export const useUiStore = create<UIState>(set => ({
   toggleSidebarView: view =>
     set(state => {
       if (state.sidebarView === view) {
-        return { sidebarView: null };
+        return { sidebarView: null , topBarView: null };
       } else {
-        return { sidebarView: view };
+        return { sidebarView: view , topBarView: null };
       }
     }),
+  toggleTopBarView: view =>
+    set(state => {
+
+      if (state.topBarView === view) {
+        return { topBarView: null,sidebarView: null };
+      } else {
+        return { topBarView: view ,sidebarView: null };
+      }
+    }),
+    otherSession:false,
+    setOtherSession: enabled => set({ otherSession: enabled }),
 
   isAttachedVirtualKeyboardVisible: true,
   setAttachedVirtualKeyboardVisibility: enabled =>
     set({ isAttachedVirtualKeyboardVisible: enabled }),
-}));
+}),
+
+
+);
 
 interface RTCState {
   peerConnection: RTCPeerConnection | null;
@@ -151,7 +178,13 @@ interface RTCState {
   appendDiskDataChannelStats: (stat: RTCDataChannelStats) => void;
 
   terminalChannel: RTCDataChannel | null;
-  setTerminalChannel: (channel: RTCDataChannel) => void;
+  setTerminalChannel: (channel: RTCDataChannel | null) => void;
+
+  kvmTerminal: RTCDataChannel | null;
+  setKvmTerminal: (channel: RTCDataChannel | null) => void;
+
+  serialConsole: RTCDataChannel | null;
+  setSerialConsole: (channel: RTCDataChannel | null) => void;
 }
 
 export const useRTCStore = create<RTCState>(set => ({
@@ -227,6 +260,11 @@ export const useRTCStore = create<RTCState>(set => ({
   // Add these new properties to the store implementation
   terminalChannel: null,
   setTerminalChannel: channel => set({ terminalChannel: channel }),
+  kvmTerminal: null,
+  setKvmTerminal: channel => set({ kvmTerminal: channel }),
+
+ serialConsole: null,
+  setSerialConsole: channel => set({ serialConsole: channel }),
 }));
 
 interface MouseMove {
@@ -356,6 +394,9 @@ interface SettingsState {
   setVideoBrightness: (value: number) => void;
   videoContrast: number;
   setVideoContrast: (value: number) => void;
+
+  forceHttp: boolean;
+  setForceHttp: (enabled: boolean) => void;
 }
 
 export const useSettingsStore = create(
@@ -422,6 +463,9 @@ export const useSettingsStore = create(
       setVideoBrightness: value => set({ videoBrightness: value }),
       videoContrast: 1.0,
       setVideoContrast: value => set({ videoContrast: value }),
+
+      forceHttp: false,
+      setForceHttp: enabled => set({ forceHttp: enabled }),
     }),
     {
       name: "settings",
@@ -530,10 +574,20 @@ export interface HidState {
 
   usbState: "configured" | "attached" | "not attached" | "suspended" | "addressed" | "default";
   setUsbState: (state: HidState["usbState"]) => void;
-
+  
   isReinitializingGadget: boolean;
   setIsReinitializingGadget: (reinitializing: boolean) => void;
 }
+
+export interface SerialState {
+  isConnected: boolean;
+  setIsConnected: (connected: boolean) => void;
+}
+
+export const useSerialStore = create<SerialState>(set => ({
+  isConnected: false,
+  setIsConnected: connected => set({ isConnected: connected }),
+}));
 
 export const useHidStore = create<HidState>((set, get) => ({
   activeKeys: [],
@@ -580,7 +634,7 @@ export const useHidStore = create<HidState>((set, get) => ({
   // Add these new properties for USB state
   usbState: "not attached",
   setUsbState: state => set({ usbState: state }),
-
+  
   isReinitializingGadget: false,
   setIsReinitializingGadget: reinitializing => set({ isReinitializingGadget: reinitializing }),
 }));
@@ -662,7 +716,15 @@ export const useUpdateStore = create<UpdateState>(set => ({
   isUpdatePending: false,
   setIsUpdatePending: isPending => set({ isUpdatePending: isPending }),
 
-  setOtaState: state => set({ otaState: state }),
+  setOtaState: state =>
+    set(current => {
+      const definedEntries = Object.entries(state).filter(([, value]) => value !== undefined);
+      const merged = {
+        ...current.otaState,
+        ...Object.fromEntries(definedEntries),
+      } as UpdateState["otaState"];
+      return { otaState: merged };
+    }),
   otaState: {
     updating: false,
     error: null,
@@ -714,7 +776,7 @@ export const useUsbConfigModalStore = create<UsbConfigModalState>(set => ({
   setErrorMessage: message => set({ errorMessage: message }),
 }));
 
-interface LocalAuthModalState {
+export interface LocalAuthModalState {
   modalView:
     | "createPassword"
     | "deletePassword"
@@ -1065,3 +1127,19 @@ export const useVpnStore = create<VpnState>(set => ({
   setZeroTierIP: networkID => set({ zeroTierIP: networkID }),
 }));
 
+export interface MacrosSideState {
+  sideTitle: string;
+  setSideTitle: (title: string) => void;
+};
+
+export const useMacrosSideTitleState = create<MacrosSideState>(set => ({
+  sideTitle: "Keyboard Macros",
+  setSideTitle: title => set({ sideTitle: title }),
+}));
+
+export interface LogEntry {
+  timestamp: string;
+  level: 'log' | 'error' | 'warn' | 'info';
+  message: string;
+  originalArgs: any[];
+}

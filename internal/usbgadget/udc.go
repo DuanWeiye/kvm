@@ -52,6 +52,16 @@ func (u *UsbGadget) RebindUsb(ignoreUnbindError bool) error {
 
 // GetUsbState returns the current state of the USB gadget
 func (u *UsbGadget) GetUsbState() (state string) {
+	// Check the auxiliary disc node first
+	discFile := "/sys/devices/platform/ff3e0000.usb2-phy/disc"
+	discBytes, err := os.ReadFile(discFile)
+	if err == nil {
+		discState := strings.TrimSpace(string(discBytes))
+		if discState == "DISCONNECTED" {
+			return "not attached"
+		}
+	}
+
 	stateFile := path.Join("/sys/class/udc", u.udc, "state")
 	stateBytes, err := os.ReadFile(stateFile)
 	if err != nil {
