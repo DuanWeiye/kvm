@@ -146,18 +146,6 @@ export default function DashboardNavbar({
                         peerConnectionState={peerConnectionState}
                       />
                     </div>
-                    <div className="hidden w-[159px] md:block">
-                      <VpnConnectionStatusCard
-                        state={peerConnectionState === "connected" ? tailScaleConnectionState : "disconnected"}
-                        title="TailScale"
-                      />
-                    </div>
-                    <div className="hidden w-[159px] md:block">
-                      <VpnConnectionStatusCard
-                        state={peerConnectionState === "connected" ? zeroTierConnectionState : "disconnected"}
-                        title="ZeroTier"
-                      />
-                    </div>
                   </>
                 )}
                 {isLoggedIn ? (

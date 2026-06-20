@@ -1,5 +1,5 @@
 import { ActionFunctionArgs, Form, redirect, useActionData } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LuEye, LuEyeOff } from "react-icons/lu";
 
 import SimpleNavbar from "@components/SimpleNavbar";
@@ -47,6 +47,63 @@ const action = async ({ request }: ActionFunctionArgs) => {
     return { error: "An error occurred while logging in" };
   }
 };
+
+interface BannedIP {
+  ip: string;
+  bannedAt: string;
+}
+
+// 被封禁 IP 列表：公开拉取（无需登录），每 5 秒刷新。
+// 封禁规则见后端 ratelimit.go：同一 IP 密码失败 2 次即永久封禁（重启清空）。
+function BannedList() {
+  const [banned, setBanned] = useState<BannedIP[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      api
+        .GET(`${DEVICE_API}/auth/banned`)
+        .then(res => (res.ok ? res.json() : { banned: [] }))
+        .then(data => {
+          if (alive) setBanned(data.banned ?? []);
+        })
+        .catch(() => {
+          /* 登录页静默失败即可 */
+        });
+    };
+    load();
+    const timer = setInterval(load, 5000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, []);
+
+  const fmtTime = (s: string) => {
+    const d = new Date(s);
+    return isNaN(d.getTime())
+      ? s
+      : d.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
+  };
+
+  return (
+    <div className="mx-auto max-w-sm text-xs text-slate-500 dark:text-[#ffffff]">
+      <div className="mb-1 font-medium">Banned IPs</div>
+      {banned.length === 0 ? (
+        <div className="text-slate-400">None</div>
+      ) : (
+        <ul className="space-y-1">
+          {banned.map(b => (
+            <li key={b.ip} className="flex justify-between gap-3">
+              <span className="font-mono">{b.ip}</span>
+              <span className="whitespace-nowrap">{fmtTime(b.bannedAt)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 export default function LoginLocalRoute() {
   const actionData = useActionData() as { error?: string; success?: boolean };
@@ -126,6 +183,8 @@ export default function LoginLocalRoute() {
                   </div>
                 </Form>
               </Fieldset>
+
+              <BannedList />
             </div>
           </div>
         </Container>

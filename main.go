@@ -118,8 +118,6 @@ func Main() {
 	// Initialize native audio socket server
 	StartAudioCtrlSocketServer()
 
-	StartVpnCtrlSocketServer()
-
 	StartDisplayCtrlSocketServer()
 
 	initPrometheus()
@@ -140,12 +138,6 @@ func Main() {
 		err = ExtractAndRunAudioBin()
 		if err != nil {
 			logger.Warn().Err(err).Msg("failed to extract and run audio bin")
-			//TODO: prepare an error message screen buffer to show on kvm screen
-		}
-
-		err = ExtractAndRunVpnBin()
-		if err != nil {
-			logger.Warn().Err(err).Msg("failed to extract and run vpn bin")
 			//TODO: prepare an error message screen buffer to show on kvm screen
 		}
 	}()

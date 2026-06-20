@@ -53,18 +53,32 @@ func setMassStorageImage(imagePath string) error {
 	return nil
 }
 
-func setMassStorageMode(cdrom bool) error {
-	mode := "0"
+// setMassStorageMode 设置虚拟介质 LUN 的呈现方式。
+// cdrom 决定目标机看到的是光驱(true)还是普通磁盘(false)。
+// readOnly 决定 LUN 的 ro 属性：true=目标机只读，false=目标机可写。
+// 注意：CDROM 必须只读；只有以真实可写文件为后端的本地镜像（如 TF 卡上的 .img）
+// 才允许 readOnly=false。远程镜像(WebRTC/HTTP 经 NBD)后端不支持写，必须保持只读。
+func setMassStorageMode(cdrom bool, readOnly bool) error {
+	cdromMode := "0"
 	if cdrom {
-		mode = "1"
+		cdromMode = "1"
+	}
+	roMode := "0"
+	if readOnly {
+		roMode = "1"
 	}
 
-	err, changed := gadget.OverrideGadgetConfig("mass_storage_lun0", "cdrom", mode)
-	if err != nil {
-		return fmt.Errorf("failed to set cdrom mode: %w", err)
+	errCdrom, cdromChanged := gadget.OverrideGadgetConfig("mass_storage_lun0", "cdrom", cdromMode)
+	if errCdrom != nil {
+		return fmt.Errorf("failed to set cdrom mode: %w", errCdrom)
 	}
 
-	if !changed {
+	errRo, roChanged := gadget.OverrideGadgetConfig("mass_storage_lun0", "ro", roMode)
+	if errRo != nil {
+		return fmt.Errorf("failed to set ro mode: %w", errRo)
+	}
+
+	if !cdromChanged && !roChanged {
 		return nil
 	}
 
@@ -329,7 +343,8 @@ func rpcMountWithHTTP(url string, mode VirtualMediaMode) error {
 	}
 	logger.Info().Str("url", url).Int64("size", n).Msg("using remote url")
 
-	if err := setMassStorageMode(mode == CDROM); err != nil {
+	// 远程镜像经 NBD 提供、后端只读，强制 ro=1
+	if err := setMassStorageMode(mode == CDROM, true); err != nil {
 		return fmt.Errorf("failed to set mass storage mode: %w", err)
 	}
 
@@ -373,7 +388,8 @@ func rpcMountWithWebRTC(filename string, size int64, mode VirtualMediaMode) erro
 	}
 	virtualMediaStateMutex.Unlock()
 
-	if err := setMassStorageMode(mode == CDROM); err != nil {
+	// WebRTC 镜像经 NBD 提供、后端只读，强制 ro=1
+	if err := setMassStorageMode(mode == CDROM, true); err != nil {
 		return fmt.Errorf("failed to set mass storage mode: %w", err)
 	}
 
@@ -414,7 +430,8 @@ func rpcMountWithStorage(filename string, mode VirtualMediaMode) error {
 		return fmt.Errorf("[rpcMountWithStorage]failed to get file info: %w", err)
 	}
 
-	if err := setMassStorageMode(mode == CDROM); err != nil {
+	// 内置 share 存储保持只读（仅 TF 卡镜像开放写入）
+	if err := setMassStorageMode(mode == CDROM, true); err != nil {
 		return fmt.Errorf("failed to set mass storage mode: %w", err)
 	}
 
@@ -451,7 +468,9 @@ func rpcMountWithSDStorage(filename string, mode VirtualMediaMode) error {
 		return fmt.Errorf("[rpcMountWithSDStorage]failed to get file info: %w", err)
 	}
 
-	if err := setMassStorageMode(mode == CDROM); err != nil {
+	// TF 卡镜像：Disk 模式开放写入(ro=0)，CDROM 模式仍只读
+	isCDROM := mode == CDROM
+	if err := setMassStorageMode(isCDROM, isCDROM); err != nil {
 		return fmt.Errorf("failed to set mass storage mode: %w", err)
 	}
 

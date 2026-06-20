@@ -116,14 +116,8 @@ type Config struct {
 	NetworkConfig        *network.NetworkConfig `json:"network_config"`
 	AppliedNetworkConfig *network.NetworkConfig `json:"applied_network_config,omitempty"`
 	DefaultLogLevel      string                 `json:"default_log_level"`
-	TailScaleAutoStart   bool                   `json:"tailscale_autostart"`
-	TailScaleXEdge       bool                   `json:"tailscale_xedge"`
-	ZeroTierNetworkID    string                 `json:"zerotier_network_id"`
-	ZeroTierAutoStart    bool                   `json:"zerotier_autostart"`
 	FrpcAutoStart        bool                   `json:"frpc_autostart"`
 	FrpcToml             string                 `json:"frpc_toml"`
-	CloudflaredAutoStart bool                   `json:"cloudflared_autostart"`
-	CloudflaredToken     string                 `json:"cloudflared_token"`
 	IO0Status            bool                   `json:"io0_status"`
 	IO1Status            bool                   `json:"io1_status"`
 	AudioMode            string                 `json:"audio_mode"`
@@ -131,12 +125,6 @@ type Config struct {
 	LEDGreenMode         string                 `json:"led_green_mode"`
 	LEDYellowMode        string                 `json:"led_yellow_mode"`
 	AutoMountSystemInfo  bool                   `json:"auto_mount_system_info_img"`
-	EasytierAutoStart    bool                   `json:"easytier_autostart"`
-	EasytierConfig       EasytierConfig         `json:"easytier_config"`
-	VntAutoStart         bool                   `json:"vnt_autostart"`
-	VntConfig            VntConfig              `json:"vnt_config"`
-	WireguardAutoStart   bool                   `json:"wireguard_autostart"`
-	WireguardConfig      WireguardConfig        `json:"wireguard_config"`
 	NpuAppEnabled               bool                   `json:"npu_app_enabled"`
 	Firewall                    *FirewallConfig        `json:"firewall"`
 	APIKey                      string                 `json:"api_key"`
@@ -174,22 +162,6 @@ type FirewallPortRule struct {
 	DestinationIP   string   `json:"destinationIP"`
 	DestinationPort int      `json:"destinationPort"`
 	Comment         string   `json:"comment"`
-}
-
-type VntConfig struct {
-	Token      string `json:"token"`
-	DeviceId   string `json:"device_id"`
-	Name       string `json:"name"`
-	ServerAddr string `json:"server_addr"`
-	ConfigMode string `json:"config_mode"` // "params" or "file"
-	ConfigFile string `json:"config_file"`
-	Model      string `json:"model"`
-	Password   string `json:"password"`
-}
-
-type WireguardConfig struct {
-	NetworkName string `json:"network_name"`
-	ConfigFile  string `json:"config_file"`
 }
 
 const configPath = "/userdata/kvm_config.json"
@@ -232,18 +204,13 @@ var defaultConfig = &Config{
 	NetworkConfig:        &network.NetworkConfig{},
 	AppliedNetworkConfig: nil,
 	DefaultLogLevel:      "INFO",
-	ZeroTierAutoStart:    false,
-	TailScaleAutoStart:   false,
-	TailScaleXEdge:       false,
 	FrpcAutoStart:        false,
-	CloudflaredAutoStart: false,
 	IO0Status:            false,
 	IO1Status:            false,
 	AudioMode:            "disabled",
 	LEDGreenMode:         "network-rx",
 	LEDYellowMode:        "kernel-activity",
-	AutoMountSystemInfo:  true,
-	WireguardAutoStart:   false,
+	AutoMountSystemInfo:  false, // 默认不自动挂载 system_info.img（仅对全新/刷机后配置生效；现有设备改 UI 开关）
 	NpuAppEnabled:        false,
 	Firewall: &FirewallConfig{
 		Base: FirewallBaseRule{

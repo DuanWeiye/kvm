@@ -30,6 +30,7 @@ type vpnToolSpec struct {
 	VersionFlags  [][]string
 }
 
+// 仅保留 frpc 的工具下载/版本管理；easytier/vnt/cloudflared 已随远程组网后端一并移除。
 var vpnToolSpecs = map[string]vpnToolSpec{
 	"frpc": {
 		Name:          "frpc",
@@ -37,27 +38,6 @@ var vpnToolSpecs = map[string]vpnToolSpec{
 		Binaries:      []string{"frpc"},
 		VersionBinary: "frpc",
 		VersionFlags:  [][]string{{"-v"}, {"--version"}, {"version"}},
-	},
-	"easytier": {
-		Name:          "easytier",
-		Repo:          "EasyTier/EasyTier",
-		Binaries:      []string{"easytier-core", "easytier-cli"},
-		VersionBinary: "easytier-cli",
-		VersionFlags:  [][]string{{"--version"}, {"-V"}, {"version"}},
-	},
-	"vnt": {
-		Name:          "vnt",
-		Repo:          "vnt-dev/vnt",
-		Binaries:      []string{"vnt-cli"},
-		VersionBinary: "vnt-cli",
-		VersionFlags:  [][]string{{}, {"--version"}, {"-V"}, {"version"}},
-	},
-	"cloudflared": {
-		Name:          "cloudflared",
-		Repo:          "cloudflare/cloudflared",
-		Binaries:      []string{"cloudflared"},
-		VersionBinary: "cloudflared",
-		VersionFlags:  [][]string{{"-v"}, {"version"}, {"--version"}},
 	},
 }
 

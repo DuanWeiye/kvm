@@ -523,41 +523,7 @@ export default function MobileHome() {
   const setZeroTierIP = useVpnStore(state => state.setZeroTierIP);
   const otherSession = useUiStore(state => state.otherSession);
   const setOtherSession = useUiStore(state => state.setOtherSession);
-  const updateVpnStates = () => {
-    // TailScaleState
-    if (tailScaleConnectionState !== "connecting" && tailScaleConnectionState !== "closed") {
-      send("getTailScaleSettings", {}, resp => {
-        if ("error" in resp) return;
-        const result = resp.result as TailScaleResponse;
-        const validState = ["closed", "connecting", "connected", "disconnected", "logined"].includes(result.state)
-          ? result.state as "closed" | "connecting" | "connected" | "disconnected" | "logined"
-          : "closed";
-
-        if(tailScaleConnectionState !== "disconnected" ) {
-          setTailScaleXEdge(result.xEdge);
-        }
-        setTailScaleConnectionState(validState);
-        setTailScaleLoginUrl(result.loginUrl);
-        setTailScaleIP(result.ip);
-      });
-    }
-
-    // ZeroTier
-    if (zeroTierConnectionState !== "connecting" && zeroTierConnectionState !== "closed") {
-      send("getZeroTierSettings", {}, resp => {
-        if ("error" in resp) return;
-        const result = resp.result as ZeroTierResponse;
-        const validState = ["closed", "connecting", "connected", "disconnected", "logined"].includes(result.state)
-          ? result.state as "closed" | "connecting" | "connected" | "disconnected" | "logined"
-          : "closed";
-        setZeroTierConnectionState(validState);
-        setZeroTierNetworkID(result.networkID);
-        setZeroTierIP(result.ip);
-      });
-    }
-  }
-
-  useInterval(updateVpnStates, 5000);
+  // 远程组网（TailScale/ZeroTier 等）后端已移除，原 updateVpnStates 5 秒轮询一并删除。
 
   const setNetworkState = useNetworkStateStore(state => state.setNetworkState);
 
@@ -635,7 +601,6 @@ export default function MobileHome() {
   useEffect(() => {
     if (rpcDataChannel?.readyState !== "open") return;
     updateVideoState();
-    updateVpnStates();
   }, [rpcDataChannel?.readyState, updateVideoState]);
 
   useEffect(() => {

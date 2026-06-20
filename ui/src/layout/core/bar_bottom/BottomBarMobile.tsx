@@ -183,16 +183,6 @@ export default function BottomBarMobile() {
             isActive={usbState === "configured"}
           />
         </div>
-        <VpnStatusButton
-          text={$at("TailScale")}
-          peerState={peerConnectionState}
-          vpnState={tailScaleConnectionState}
-        />
-        <VpnStatusButton
-          text={$at("Zerotier")}
-          peerState={peerConnectionState}
-          vpnState={zeroTierConnectionState}
-        />
       </div>
     </div>
   );

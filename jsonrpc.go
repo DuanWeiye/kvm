@@ -873,7 +873,15 @@ func rpcSetMassStorageMode(mode string) (string, error) {
 
 	logger.Info().Str("mode", mode).Msg("Setting mass storage mode")
 
-	err := setMassStorageMode(cdrom)
+	// 与挂载逻辑保持一致：仅 TF 卡来源的磁盘(file)模式开放写入，其余一律只读
+	readOnly := true
+	if !cdrom {
+		if st, _ := rpcGetVirtualMediaState(); st != nil && st.Source == SDStorage {
+			readOnly = false
+		}
+	}
+
+	err := setMassStorageMode(cdrom, readOnly)
 	if err != nil {
 		return "", fmt.Errorf("failed to set mass storage mode: %w", err)
 	}
@@ -1748,13 +1756,6 @@ var rpcHandlers = map[string]RPCHandler{
 	"getIOInputStatus":          {Func: rpcGetIOInputStatus},
 	"resetIOInput":              {Func: rpcResetIOInput},
 	"getSDMountStatus":          {Func: rpcGetSDMountStatus},
-	"loginTailScale":            {Func: rpcLoginTailScale, Params: []string{"xEdge"}},
-	"logoutTailScale":           {Func: rpcLogoutTailScale},
-	"cancelTailScale":           {Func: rpcCancelTailScale},
-	"getTailScaleSettings":      {Func: rpcGetTailScaleSettings},
-	"loginZeroTier":             {Func: rpcLoginZeroTier, Params: []string{"networkID"}},
-	"logoutZeroTier":            {Func: rpcLogoutZeroTier, Params: []string{"networkID"}},
-	"getZeroTierSettings":       {Func: rpcGetZeroTierSettings},
 	"setUpdateSource":           {Func: rpcSetUpdateSource, Params: []string{"source"}},
 	"getAudioMode":              {Func: rpcGetAudioMode},
 	"setAudioMode":              {Func: rpcSetAudioMode, Params: []string{"mode"}},
@@ -1763,23 +1764,6 @@ var rpcHandlers = map[string]RPCHandler{
 	"getFrpcStatus":             {Func: rpcGetFrpcStatus},
 	"getFrpcToml":               {Func: rpcGetFrpcToml},
 	"getFrpcLog":                {Func: rpcGetFrpcLog},
-	"startEasyTier":             {Func: rpcStartEasyTier, Params: []string{"name", "secret", "node"}},
-	"stopEasyTier":              {Func: rpcStopEasyTier},
-	"getEasyTierStatus":         {Func: rpcGetEasyTierStatus},
-	"getEasyTierConfig":         {Func: rpcGetEasyTierConfig},
-	"getEasyTierLog":            {Func: rpcGetEasyTierLog},
-	"startVnt":                  {Func: rpcStartVnt, Params: []string{"config_mode", "token", "device_id", "name", "server_addr", "config_file", "model", "password"}},
-	"stopVnt":                   {Func: rpcStopVnt},
-	"getVntStatus":              {Func: rpcGetVntStatus},
-	"getVntConfig":              {Func: rpcGetVntConfig},
-	"getVntConfigFile":          {Func: rpcGetVntConfigFile},
-	"getVntLog":                 {Func: rpcGetVntLog},
-	"getVntInfo":                {Func: rpcGetVntInfo},
-	"getEasyTierNodeInfo":       {Func: rpcGetEasyTierNodeInfo},
-	"startCloudflared":          {Func: rpcStartCloudflared, Params: []string{"token"}},
-	"stopCloudflared":           {Func: rpcStopCloudflared},
-	"getCloudflaredStatus":      {Func: rpcGetCloudflaredStatus},
-	"getCloudflaredLog":         {Func: rpcGetCloudflaredLog},
 	"getVpnToolSystemInfo":      {Func: rpcGetVpnToolSystemInfo},
 	"getVpnToolStatus":          {Func: rpcGetVpnToolStatus, Params: []string{"tool"}},
 	"listVpnToolReleases":       {Func: rpcListVpnToolReleases, Params: []string{"tool"}},
@@ -1794,12 +1778,6 @@ var rpcHandlers = map[string]RPCHandler{
 	"getVideoRc":                {Func: rpcGetVideoRc},
 	"setNpuAppStatus":           {Func: rpcSetNpuAppStatus, Params: []string{"enable"}},
 	"getNpuAppStatus":           {Func: rpcGetNpuAppStatus},
-	"startWireguard":            {Func: rpcStartWireguard, Params: []string{"configFile"}},
-	"stopWireguard":             {Func: rpcStopWireguard},
-	"getWireguardStatus":        {Func: rpcGetWireguardStatus},
-	"getWireguardConfig":        {Func: rpcGetWireguardConfig},
-	"getWireguardLog":           {Func: rpcGetWireguardLog},
-	"getWireguardInfo":          {Func: rpcGetWireguardInfo},
 	"getFirewallConfig":         {Func: rpcGetFirewallConfig},
 	"setFirewallConfig":         {Func: rpcSetFirewallConfig, Params: []string{"config"}},
 	"getBootStorageType":        {Func: rpcGetBootStorageType},

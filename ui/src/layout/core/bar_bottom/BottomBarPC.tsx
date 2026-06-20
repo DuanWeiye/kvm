@@ -124,18 +124,6 @@ export default function BottomBarPC() {
               align="left"
             />
 
-            <VpnStatusButton
-              text={$at("TailScale")}
-              peerState={peerConnectionState}
-              vpnState={tailScaleConnectionState}
-            />
-
-            <VpnStatusButton
-              text={$at("Zerotier")}
-              peerState={peerConnectionState}
-              vpnState={zeroTierConnectionState}
-            />
-
             {showPressedKeys && (
               <PressedKeysDisplay
                 activeKeys={activeKeys}

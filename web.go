@@ -72,6 +72,12 @@ func setupRouter() *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	gin.DisableConsoleColor()
 	r := gin.Default()
+
+	// 不信任任何反向代理：直接以 TCP 对端地址作为来源 IP（c.ClientIP()），
+	// 防止攻击者伪造 X-Forwarded-For 绕过 fail2ban 计数，或伪装成白名单内网 IP。
+	// 本设备直接监听 :80/:443；若日后置于会改写真实 IP 的反向代理之后，需改为
+	// SetTrustedProxies([]string{"<代理CIDR>"}) 并确保代理透传真实客户端 IP。
+	_ = r.SetTrustedProxies(nil)
 	r.Use(gin_logger.SetLogger(
 		gin_logger.WithLogger(func(*gin.Context, zerolog.Logger) zerolog.Logger {
 			return *ginLogger
@@ -103,6 +109,8 @@ func setupRouter() *gin.Engine {
 
 	r.StaticFS("/static", http.FS(staticFS))
 	r.POST("/auth/login-local", handleLogin)
+	// 公开的封禁 IP 列表（登录页展示用，无需登录）
+	r.GET("/auth/banned", handleListBannedIPs)
 
 	// We use this to determine if the device is setup
 	r.GET("/device/status", handleDeviceStatus)
@@ -442,9 +450,9 @@ func handleLogin(c *gin.Context) {
 	}
 
 	ip := c.ClientIP()
-	if allowed, wait := CheckRateLimit(ip); !allowed {
-		c.JSON(http.StatusTooManyRequests, gin.H{
-			"error": fmt.Sprintf("Too many failed attempts. Please try again in %s", wait.Round(time.Second)),
+	if !CheckRateLimit(ip) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "Your IP has been banned due to too many failed login attempts.",
 		})
 		return
 	}
@@ -471,6 +479,11 @@ func handleLogin(c *gin.Context) {
 	c.SetCookie("authToken", config.LocalAuthToken, 0, "/", "", false, true)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Login successful"})
+}
+
+// handleListBannedIPs 返回当前被永久封禁的 IP 及封禁时间。公开端点，无需登录。
+func handleListBannedIPs(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"banned": ListBannedIPs()})
 }
 
 func handleLogout(c *gin.Context) {
@@ -537,8 +550,8 @@ func basicAuthProtectedMiddleware(requireDeveloperMode bool) gin.HandlerFunc {
 		}
 
 		ip := c.ClientIP()
-		if allowed, wait := CheckRateLimit(ip); !allowed {
-			sendErrorJsonThenAbort(c, http.StatusTooManyRequests, fmt.Sprintf("Too many failed attempts. Please try again in %s", wait.Round(time.Second)))
+		if !CheckRateLimit(ip) {
+			sendErrorJsonThenAbort(c, http.StatusForbidden, "Your IP has been banned due to too many failed login attempts.")
 			return
 		}
 

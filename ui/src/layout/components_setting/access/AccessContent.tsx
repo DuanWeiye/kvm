@@ -71,7 +71,7 @@ export interface CloudflaredRunningResponse {
   running: boolean;
 }
 
-type ManagedVpnTool = "frpc" | "easytier" | "vnt" | "cloudflared";
+type ManagedVpnTool = "frpc";
 
 export interface VpnToolSystemInfo {
   goos: string;
@@ -161,7 +161,7 @@ function AccessContent({ setOpenDialog }: { setOpenDialog: (open: boolean) => vo
   const [tlsCert, setTlsCert] = useState<string>("");
   const [tlsKey, setTlsKey] = useState<string>("");
 
-  const [activeTab, setActiveTab] = useState("tailscale");
+  const [activeTab, setActiveTab] = useState("frp");
     
   const tailScaleConnectionState = useVpnStore(state => state.tailScaleConnectionState);
   const tailScaleLoginUrl = useVpnStore(state => state.tailScaleLoginUrl);
@@ -337,7 +337,7 @@ function AccessContent({ setOpenDialog }: { setOpenDialog: (open: boolean) => vo
     });
   }, [send]);
 
-  const managedTools: ManagedVpnTool[] = ["frpc", "easytier", "vnt", "cloudflared"];
+  const managedTools: ManagedVpnTool[] = ["frpc"];
 
   const getVpnToolSystemInfo = useCallback(() => {
     send("getVpnToolSystemInfo", {}, resp => {
@@ -450,9 +450,6 @@ function AccessContent({ setOpenDialog }: { setOpenDialog: (open: boolean) => vo
     });
   }, [send, refreshVpnToolManager]);
 
-  useEffect(() => {
-    getCloudflaredStatus();
-  }, [getCloudflaredStatus]);
 
   useEffect(() => {
     getVpnToolSystemInfo();
@@ -474,18 +471,12 @@ function AccessContent({ setOpenDialog }: { setOpenDialog: (open: boolean) => vo
   useEffect(() => {
     const tabToolMap: Partial<Record<string, ManagedVpnTool>> = {
       frp: "frpc",
-      easytier: "easytier",
-      vnt: "vnt",
-      cloudflared: "cloudflared",
     };
     const tool = tabToolMap[activeTab];
     if (tool) {
       refreshVpnToolManager(tool, false);
     }
-    if (activeTab === "cloudflared") {
-      getCloudflaredStatus();
-    }
-  }, [activeTab, refreshVpnToolManager, getCloudflaredStatus]);
+  }, [activeTab, refreshVpnToolManager]);
 
   // Handle TLS mode change
   const handleTlsModeChange = (value: string) => {
@@ -882,15 +873,7 @@ function AccessContent({ setOpenDialog }: { setOpenDialog: (open: boolean) => vo
     });
   }, [send]);
  
-  useEffect(() => {
-    getEasyTierConfig();
-    getEasyTierStatus();
-  }, [getEasyTierStatus, getEasyTierConfig]);
-
-  useEffect(() => {
-    getWireguardConfig();
-    getWireguardStatus();
-  }, [getWireguardStatus, getWireguardConfig]);
+  // EasyTier / WireGuard 后端已移除，删除其挂载时的状态拉取（避免调用不存在的 RPC 报错）
   
   useEffect(() => {
     if (tempEasyTierNetworkNodeMode === 'default') {
@@ -1065,11 +1048,7 @@ function AccessContent({ setOpenDialog }: { setOpenDialog: (open: boolean) => vo
     });
   }, [send]);
  
-  useEffect(() => {
-    getVntConfig();
-    getVntStatus();
-    getVntConfigFile();
-  }, [getVntStatus, getVntConfig]);
+  // Vnt 后端已移除，删除其挂载时的状态拉取（避免调用不存在的 RPC 报错）
 
   const renderVpnToolManager = (tool: ManagedVpnTool, label: string) => {
     const status = vpnToolStatusMap[tool];
@@ -1371,12 +1350,6 @@ function AccessContent({ setOpenDialog }: { setOpenDialog: (open: boolean) => vo
         <div className="overflow-x-auto pb-2">
           <div className="flex min-w-max">
             {[
-              { id: "tailscale", label: "TailScale" },
-              { id: "zerotier", label: "ZeroTier" },
-              { id: "wireguard", label: "WireGuard" },
-              { id: "easytier", label: "EasyTier" },
-              { id: "vnt", label: "Vnt" },
-              { id: "cloudflared", label: "CloudFlare" },
               { id: "frp", label: "Frp" },
             ].map((tab) => (
               <button
@@ -1398,639 +1371,6 @@ function AccessContent({ setOpenDialog }: { setOpenDialog: (open: boolean) => vo
         </div>
 
         <div>
-          {activeTab === "tailscale" && (
-                <AutoHeight>
-                  <GridCard>
-                    <div className="p-4">
-                      <div className="space-y-4">
-                        {/* Experimental Badge */}
-                        <div>
-                          <span className="inline-flex items-center rounded border border-red-500 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400">
-                            Experimental
-                          </span>
-                        </div>
-
-                        {/* TailScale use xEdge server - checkbox on the right */}
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-slate-700 dark:text-slate-300">
-                            {$at("TailScale use xEdge server")}
-                          </span>
-                          <Checkbox 
-                            disabled={tailScaleConnectionState !== "disconnected"}
-                            checked={tailScaleXEdge}
-                            onChange={e => {
-                              if (tailScaleConnectionState !== "disconnected") {
-                                notifications.error("TailScale is running and this setting cannot be modified");
-                                return;
-                              }
-                              handleTailScaleXEdgeChange(e.target.checked);
-                            }}
-                          />
-                        </div>
-
-                        {tailScaleConnectionState === "connecting" && (
-                          <div className="flex items-center justify-between gap-x-2">
-                            <p>Connecting...</p>
-                            <Button
-                              size="SM"
-                              theme="light"
-                              text={$at("Cancel")}
-                              onClick={handleTailScaleCancel}
-                            /> 
-                          </div>
-                        )}
-
-                        {tailScaleConnectionState === "connected" && (
-                          <div className="space-y-4">
-                            <div className="flex items-center gap-x-2 justify-between">
-                              {tailScaleLoginUrl && (
-                                <p>{$at("Login URL:")} <a href={tailScaleLoginUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400">LoginUrl</a></p> 
-                              )}
-                              {!tailScaleLoginUrl && (
-                                <p>{$at("Wait to obtain the Login URL")}</p> 
-                              )} 
-                              <Button
-                                size="SM"
-                                theme="danger"
-                                text={isDisconnecting ? $at("Quitting...") : $at("Quit")}
-                                onClick={handleTailScaleLogout}
-                                disabled={isDisconnecting === true}
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {tailScaleConnectionState === "logined" && (
-                          <div className="space-y-4">
-                            {/* IP and Quit button on the same line */}
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-slate-700 dark:text-slate-300">
-                                IP: {tailScaleIP}
-                              </span>
-                              <Button
-                                size="SM"
-                                theme="danger"
-                                text={isDisconnecting ? $at("Quitting...") : $at("Quit")}
-                                onClick={handleTailScaleLogout}
-                                disabled={isDisconnecting === true}
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {tailScaleConnectionState === "closed" && (
-                          <div className="text-sm text-red-600 dark:text-red-400">
-                            <p>Connect fail, please retry</p>
-                          </div>    
-                        )}
-
-                        {((tailScaleConnectionState === "disconnected") || (tailScaleConnectionState === "closed")) && (
-                          <Button
-                            size="SM"
-                            theme="primary"
-                            text={$at("Enable")}
-                            onClick={handleTailScaleLogin}
-                          />
-                        )}
-                      </div>
-                    </div>
-                  </GridCard>
-                </AutoHeight>
-          )}
-
-          {activeTab === "zerotier" && (
-                <AutoHeight>
-                  <GridCard>
-                    <div className="p-4">
-                      <div className="space-y-4">
-                        {/* Experimental Badge */}
-                        <div>
-                          <span className="inline-flex items-center rounded border border-red-500 px-2 py-0.5 text-xs font-medium text-red-600 dark:text-red-400">
-                            Experimental
-                          </span>
-                        </div>
-
-                        {zeroTierConnectionState === "connecting" && (
-                          <div className="text-sm text-slate-700 dark:text-slate-300">
-                            <p>{$at("Connecting...")}</p>
-                          </div>
-                        )}
-
-                        {zeroTierConnectionState === "connected" && (
-                          <div className="flex-1 space-y-2">
-                            <div className="flex justify-between border-slate-800/10 pt-2 dark:border-slate-300/20">
-                              <span className="text-sm text-slate-600 dark:text-slate-400">
-                                {$at("Network ID")}
-                              </span>
-                              <span className="text-right text-sm font-medium">
-                                {zeroTierNetworkID}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-x-2">
-                              <Button
-                                size="SM"
-                                theme="danger"
-                                text={$at("Quit")}
-                                onClick={handleZeroTierLogout}
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {zeroTierConnectionState === "logined" && (
-                          <div className="flex-1 space-y-2">
-                            <div className="flex justify-between border-slate-800/10 pt-2 dark:border-slate-300/20">
-                              <span className="text-sm text-slate-600 dark:text-slate-400">
-                                {$at("Network ID")}
-                              </span>
-                              <span className="text-right text-sm font-medium">
-                                {zeroTierNetworkID}
-                              </span>
-                            </div>
-                            <div className="flex justify-between border-t border-slate-800/10 pt-2 dark:border-slate-300/20">
-                              <span className="text-sm text-slate-600 dark:text-slate-400">
-                                {$at("Network IP")}
-                              </span>
-                              <span className="text-right text-sm font-medium">
-                                {zeroTierIP}
-                              </span>
-                            </div> 
-                            <div className="flex items-center gap-x-2">
-                              <Button
-                                size="SM"
-                                theme="danger"
-                                text={$at("Quit")}
-                                onClick={handleZeroTierLogout}
-                              />
-                            </div>                
-                          </div>
-                        )}
-
-                        {zeroTierConnectionState === "closed" && (
-                          <div className="flex items-center gap-x-2 justify-between">
-                            <p>{$at("Connect fail, please retry")}</p>
-                            <Button
-                              size="SM"
-                              theme="light"
-                              text={$at("Retry")}
-                              onClick={handleZeroTierLogout}
-                            /> 
-                          </div>
-                        )}
-
-                        {(zeroTierConnectionState === "disconnected") && (
-                          <div className="flex items-end gap-x-2">
-                            <InputFieldWithLabel
-                              size="SM"
-                              label={$at("Network ID")}
-                              value={tempNetworkID}
-                              onChange={handleZeroTierNetworkIdChange}
-                              placeholder={$at("Enter ZeroTier Network ID")}
-                            />
-                            <Button
-                              size="SM"
-                              theme="primary"
-                              text={$at("Join in")}
-                              onClick={handleZeroTierLogin}
-                            />
-                          </div> 
-                        )}
-                      </div>
-                    </div>
-                  </GridCard>
-                </AutoHeight>
-          )}
-
-          {activeTab === "wireguard" && (
-                <AutoHeight>
-                  <GridCard>
-                    <div className="p-4">
-                      <div className="space-y-4">
-                        <TextAreaWithLabel
-                          label={$at("Edit wg0.conf")}
-                          placeholder={$at("Enter WireGuard configuration")}
-                          value={wireguardConfigFileContent || ""}
-                          rows={5}
-                          readOnly={wireguardRunningStatus.running}
-                          onChange={e => setWireguardConfigFileContent(e.target.value)}
-                        />
-                        <div className="flex items-center gap-x-2">
-                          {wireguardRunningStatus.running ? (
-                            <div className="flex items-center gap-x-2">
-                              <Button
-                                size="SM"
-                                theme="danger"
-                                text={$at("Stop")}
-                                onClick={handleStopWireguard}
-                              />
-                              <Button
-                                size="SM"
-                                theme="light"
-                                text={$at("Log")}
-                                onClick={handleGetWireguardLog}
-                              />
-                              <Button
-                                size="SM"
-                                theme="light"
-                                text={$at("Status")}
-                                onClick={handleGetWireguardInfo}
-                              />
-                            </div>
-                          ) : (
-                            <Button
-                              size="SM"
-                              theme="primary"
-                              text={$at("Start")}
-                              onClick={handleStartWireguard}
-                            />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </GridCard>
-                </AutoHeight>
-          )}
-
-          {activeTab === "easytier" && (
-                <AutoHeight>
-                  <GridCard>
-                    <div className="p-4">
-                      <div className="space-y-4">
-                        {renderVpnToolManager("easytier", "EasyTier")}
-                        { easyTierRunningStatus.running ? (  
-                          <div className="flex-1 space-y-2">
-                            <div className="flex justify-between border-t border-slate-800/10 pt-2 dark:border-slate-300/20">
-                              <span className="text-sm text-slate-600 dark:text-slate-400">
-                                {$at("Network Node")}
-                              </span>
-                              <span className="text-right text-sm font-medium">
-                                {easyTierConfig.node || tempEasyTierNetworkNode}
-                              </span>
-                            </div>
-                            <div className="flex justify-between border-slate-800/10 pt-2 dark:border-slate-300/20">
-                              <span className="text-sm text-slate-600 dark:text-slate-400">
-                                {$at("Network Name")}
-                              </span>
-                              <span className="text-right text-sm font-medium">
-                                {easyTierConfig.name || tempEasyTierNetworkName}
-                              </span>
-                            </div>
-                            <div className="flex justify-between border-t border-slate-800/10 pt-2 dark:border-slate-300/20">
-                              <span className="text-sm text-slate-600 dark:text-slate-400">
-                                {$at("Network Secret")}
-                              </span>
-                              <span className="text-right text-sm font-medium">
-                                {easyTierConfig.secret || tempEasyTierNetworkSecret}
-                              </span>
-                            </div>
-                            
-                            <div className="flex items-center gap-x-2">
-                              <Button
-                                size="SM"
-                                theme="danger"
-                                text={$at("Stop")}
-                                onClick={handleStopEasyTier}
-                              />
-                              <Button
-                                size="SM"
-                                theme="light"
-                                text={$at("Log")}
-                                onClick={handleGetEasyTierLog}
-                              />
-                              <Button
-                                size="SM"
-                                theme="light"
-                                text={$at("Node Info")}
-                                onClick={handleGetEasyTierNodeInfo}
-                              />
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="space-y-4"> 
-                            <div className="space-y-4">
-                              <SettingsItem
-                                title={$at("Network Node")}
-                                description=""
-                              >
-                                <Select
-                                  className={isMobile ? "!w-full !h-[36px]" : "!w-[28%] !h-[36px]"} 
-                                  value={tempEasyTierNetworkNodeMode}
-                                  onChange={e => setTempEasyTierNetworkNodeMode(e)}
-                                  options={[
-                                    { value: "default", label: $at("Default") },
-                                    { value: "custom", label: $at("Custom") },
-                                  ]}
-                                />
-                              </SettingsItem>
-                            </div> 
-                            {tempEasyTierNetworkNodeMode === "custom" && (
-                              <div className="flex items-end gap-x-2">
-                                <InputFieldWithLabel
-                                  size="SM"
-                                  label={$at("Network Node")}
-                                  value={tempEasyTierNetworkNode}
-                                  onChange={e => setTempEasyTierNetworkNode(e.target.value)}
-                                  placeholder={$at("Enter EasyTier Network Node")}
-                                />
-                              </div>
-                            )}
-                            <div className="flex items-end gap-x-2">
-                              <InputFieldWithLabel
-                                size="SM"
-                                label={$at("Network Name")}
-                                value={tempEasyTierNetworkName}
-                                onChange={e => setTempEasyTierNetworkName(e.target.value)}
-                                placeholder={$at("Enter EasyTier Network Name")}
-                              />
-                            </div> 
-                            <div className="flex items-end gap-x-2">
-                              <InputFieldWithLabel
-                                size="SM"
-                                label={$at("Network Secret")}
-                                value={tempEasyTierNetworkSecret}
-                                onChange={e => setTempEasyTierNetworkSecret(e.target.value)}
-                                placeholder={$at("Enter EasyTier Network Secret")}
-                              />
-                            </div> 
-
-                            <div className="flex items-center gap-x-2">
-                              <Button
-                                size="SM"
-                                theme="primary"
-                                text={$at("Start")}
-                                onClick={handleStartEasyTier}
-                              />
-                            </div>
-                          </div>
-                        )} 
-                      </div>
-                    </div>
-                  </GridCard>
-                </AutoHeight>
-          )}
-
-          {activeTab === "vnt" && (
-                <AutoHeight>
-                  <GridCard>
-                    <div className="p-4">
-                      <div className="space-y-4">
-                        {renderVpnToolManager("vnt", "Vnt")}
-                        { vntRunningStatus.running ? (  
-  
-                          <div className="flex-1 space-y-2">
-                            <div className="flex justify-between border-slate-800/10 pt-2 dark:border-slate-300/20">
-                              <span className="text-sm text-slate-600 dark:text-slate-400">
-                                {$at("Config Mode")}
-                              </span>
-                              <span className="text-right text-sm font-medium">
-                                {vntConfig.config_mode === "file" ? $at("Config File") : $at("Parameters")}
-                              </span>
-                            </div>
-                            
-                            {vntConfig.config_mode === "file" ? (
-                              <div className="flex justify-between border-t border-slate-800/10 pt-2 dark:border-slate-300/20">
-                                <span className="text-sm text-slate-600 dark:text-slate-400">
-                                  {$at("Config")}
-                                </span>
-                                <span className="text-right text-sm font-medium">
-                                  {$at("Using config file")}
-                                </span>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="flex justify-between border-t border-slate-800/10 pt-2 dark:border-slate-300/20">
-                                  <span className="text-sm text-slate-600 dark:text-slate-400">
-                                    {$at("Token")}
-                                  </span>
-                                  <span className="text-right text-sm font-medium">
-                                    {vntConfig.token || tempVntToken}
-                                  </span>
-                                </div>
-                                {(vntConfig.device_id || tempVntDeviceId) && (
-                                  <div className="flex justify-between border-t border-slate-800/10 pt-2 dark:border-slate-300/20">
-                                    <span className="text-sm text-slate-600 dark:text-slate-400">
-                                      {$at("Device ID")}
-                                    </span>
-                                    <span className="text-right text-sm font-medium">
-                                      {vntConfig.device_id || tempVntDeviceId}
-                                    </span>
-                                  </div>
-                                )}
-                                {(vntConfig.name || tempVntName) && (
-                                  <div className="flex justify-between border-t border-slate-800/10 pt-2 dark:border-slate-300/20">
-                                    <span className="text-sm text-slate-600 dark:text-slate-400">
-                                      {$at("Name")}
-                                    </span>
-                                    <span className="text-right text-sm font-medium">
-                                      {vntConfig.name || tempVntName}
-                                    </span>
-                                  </div>
-                                )}
-                                {(vntConfig.server_addr || tempVntServerAddr) && (
-                                  <div className="flex justify-between border-t border-slate-800/10 pt-2 dark:border-slate-300/20">
-                                    <span className="text-sm text-slate-600 dark:text-slate-400">
-                                      {$at("Server Address")}
-                                    </span>
-                                    <span className="text-right text-sm font-medium">
-                                      {vntConfig.server_addr || tempVntServerAddr}
-                                    </span>
-                                  </div>
-                                )}
-                              </>
-                            )}
-                            
-                            <div className="flex items-center gap-x-2">
-                              <Button
-                                size="SM"
-                                theme="danger"
-                                text={$at("Stop")}
-                                onClick={handleStopVnt}
-                              />
-                              <Button
-                                size="SM"
-                                theme="light"
-                                text={$at("Log")}
-                                onClick={handleGetVntLog}
-                              />
-                              <Button
-                                size="SM"
-                                theme="light"
-                                text={$at("Info")}
-                                onClick={handleGetVntInfo}
-                              />
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            {/* Config Mode Selector */}
-                            <div className="space-y-4">
-                              <SettingsItem
-                                title={$at("Config Mode")}
-                                description=""
-                              >
-                                <Select
-                                  className={isMobile ? "!w-full !h-[36px]" : "!w-[28%] !h-[36px]"}  
-                                  value={vntConfigMode}
-                                  onChange={e => setVntConfigMode(e)}
-                                  options={[
-                                    { value: "params", label: $at("Parameters") },
-                                    { value: "file", label: $at("Config File") },
-                                  ]}
-                                />
-                              </SettingsItem>
-                            </div>
-                            
-                            {vntConfigMode === "file" ? (
-                              // Config File Mode
-                              <div className="space-y-4">
-                                <TextAreaWithLabel
-                                  label={$at("Edit vnt.ini")}
-                                  placeholder={$at("Enter vnt-cli configuration")}
-                                  value={vntConfigFileContent || ""}
-                                  rows={5}
-                                  onChange={e => setVntConfigFileContent(e.target.value)}
-                                />
-                              </div>
-                            ) : (
-                              // Parameters Mode
-                              <div className="space-y-4">
-                                <div className="flex items-end gap-x-2">
-                                  <InputFieldWithLabel
-                                    size="SM"
-                                    label={$at("Token (Required)")}
-                                    value={tempVntToken}
-                                    onChange={e => setTempVntToken(e.target.value)}
-                                    placeholder={$at("Enter Vnt Token")}
-                                  />
-                                </div> 
-                                <div className="flex items-end gap-x-2">
-                                  <InputFieldWithLabel
-                                    size="SM"
-                                    label={$at("Device ID (Optional)")}
-                                    value={tempVntDeviceId}
-                                    onChange={e => setTempVntDeviceId(e.target.value)}
-                                    placeholder={$at("Enter Device ID")}
-                                  />
-                                </div>
-                                <div className="flex items-end gap-x-2">
-                                  <InputFieldWithLabel
-                                    size="SM"
-                                    label={$at("Name (Optional)")}
-                                    value={tempVntName}
-                                    onChange={e => setTempVntName(e.target.value)}
-                                    placeholder={$at("Enter Device Name")}
-                                  />
-                                </div>
-                                <div className="flex items-end gap-x-2">
-                                  <InputFieldWithLabel
-                                    size="SM"
-                                    label={$at("Server Address (Optional)")}
-                                    value={tempVntServerAddr}
-                                    onChange={e => setTempVntServerAddr(e.target.value)}
-                                    placeholder={$at("Enter Server Address")}
-                                  />
-                                </div>
-                                
-                                <div className="space-y-4">
-                                  <SettingsItem
-                                    title={$at("Encryption Algorithm")}
-                                    description=""
-                                  >
-                                    <Select
-                                      className={isMobile ? "!w-full !h-[36px]" : "!w-[28%] !h-[36px]"}
-                                      value={tempVntModel}
-                                      onChange={e => setTempVntModel(e)}
-                                      options={[
-                                        { value: "aes_gcm", label: "aes_gcm" },
-                                        { value: "chacha20_poly1305", label: "chacha20_poly1305" },
-                                        { value: "chacha20", label: "chacha20" },
-                                        { value: "aes_cbc", label: "aes_cbc" },
-                                        { value: "aes_ecb", label: "aes_ecb" },
-                                        { value: "sm4_cbc", label: "sm4_cbc" },
-                                        { value: "xor", label: "xor" },
-                                      ]}
-                                    />
-                                  </SettingsItem>
-                                </div>
-                                
-                                <div className="flex items-end gap-x-2">
-                                  <InputFieldWithLabel
-                                    size="SM"
-                                    type="password"
-                                    label={$at("Password(Optional)")}
-                                    value={tempVntPassword}
-                                    onChange={e => setTempVntPassword(e.target.value)}
-                                    placeholder={$at("Enter Vnt Password")}
-                                  />
-                                </div>
-                              </div>
-                            )}
-                            
-                            <div className="flex items-center gap-x-2">
-                              <Button
-                                size="SM"
-                                theme="primary"
-                                text={$at("Start")}
-                                onClick={handleStartVnt}
-                              />
-                            </div>
-                          </div>
-                        )} 
-                      </div>
-                    </div>
-                  </GridCard>
-                </AutoHeight>
-          )}
-
-          {activeTab === "cloudflared" && (
-                <AutoHeight>
-                  <GridCard>
-                    <div className="p-4">
-                      <div className="space-y-4">
-                        {renderVpnToolManager("cloudflared", "Cloudflare")}
-                        {cloudflaredRunningStatus.running ? (
-                          <div className="flex items-center gap-x-2">
-                            <Button
-                              size="SM"
-                              theme="danger"
-                              text={$at("Stop")}
-                              onClick={handleStopCloudflared}
-                            />
-                            <Button
-                              size="SM"
-                              theme="light"
-                              text={$at("Log")}
-                              onClick={handleGetCloudflaredLog}
-                            />
-                          </div>
-                        ) : (
-                          <>
-                            <div className="flex items-end gap-x-2">
-                              <InputFieldWithLabel
-                                size="SM"
-                                type="text"
-                                label={$at("Cloudflare Tunnel Token")}
-                                value={cloudflaredToken}
-                                onChange={e => setCloudflaredToken(e.target.value)}
-                                placeholder={$at("Enter Cloudflare Tunnel Token")}
-                              />
-                          </div>
-                            <div className="flex items-center gap-x-2">
-                              <Button
-                                size="SM"
-                                theme="primary"
-                                text={$at("Start")}
-                                onClick={handleStartCloudflared}
-                              />
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </GridCard>
-                </AutoHeight>
-          )}
-
           {activeTab === "frp" && (
                 <AutoHeight>
                   <GridCard>
@@ -2077,50 +1417,6 @@ function AccessContent({ setOpenDialog }: { setOpenDialog: (open: boolean) => vo
           )}
       </div>
 
-      <LogDialog
-        open={showCloudflaredLogModal}
-        onClose={() => {
-          setShowCloudflaredLogModal(false);
-        }}
-        title="Cloudflare Log"
-        description={cloudflaredLog}
-      />
-
-      <LogDialog
-        open={showEasyTierLogModal}
-        onClose={() => {
-          setShowEasyTierLogModal(false);
-        }}
-        title="EasyTier Log"
-        description={easyTierLog}
-      />
-      
-      <LogDialog
-        open={showEasyTierNodeInfoModal}
-        onClose={() => {
-          setShowEasyTierNodeInfoModal(false);
-        }}
-        title="EasyTier Node Info"
-        description={easyTierNodeInfo}
-      />
-        
-      <LogDialog
-        open={showWireguardLogModal}
-        onClose={() => {
-          setShowWireguardLogModal(false);
-        }}
-        title="WireGuard Log"
-        description={wireguardLog}
-      />
-
-      <LogDialog
-        open={showWireguardInfoModal}
-        onClose={() => {
-          setShowWireguardInfoModal(false);
-        }}
-        title="WireGuard Status"
-        description={wireguardInfo}
-      />
 
       <LogDialog
         open={showFrpcLogModal}
@@ -2131,23 +1427,6 @@ function AccessContent({ setOpenDialog }: { setOpenDialog: (open: boolean) => vo
         description={frpcLog}
       />
 
-      <LogDialog
-        open={showVntLogModal}
-        onClose={() => {
-          setShowVntLogModal(false);
-        }}
-        title="Vnt Log"
-        description={vntLog}
-      />
-      
-      <LogDialog
-        open={showVntInfoModal}
-        onClose={() => {
-          setShowVntInfoModal(false);
-        }}
-        title="Vnt Info"
-        description={vntInfo}
-      />
 
     </div>
     </div>
