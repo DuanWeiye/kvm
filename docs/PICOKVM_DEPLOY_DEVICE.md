@@ -85,6 +85,16 @@ ssh root@<DEVICE_IP> 'mv -f /userdata/picokvm/bin/kvm_app.bak /userdata/picokvm/
 
 ## 5. 备注
 - 产物是 `build_dev`（版本 0.1.3-dev、**未签名**）。手动替换 `/userdata/picokvm/bin/kvm_app` 直接 exec，不过 OTA 签名校验，可正常跑；**不影响系统 0.1.7**。
+- **⚠️ 让官方 OTA 真正可用（检测+校验+应用）的完整构建配方**——默认 `make build_dev` 两处都不满足：
+  ```bash
+  make build_dev VERSION_DEV=0.1.3 \
+       OTA_PUBLIC_KEY=4d78341c5c66fd5c09635d45ad3aa0ae7ab131f9e945868ec9726fbc1367a452
+  ```
+  1. **版本号**：默认 `0.1.3-dev` 是 semver 预发布版（< 0.1.3），`ota.go:GetUpdateStatus` 按 `remote.GreaterThan(local)` 比较 → 本地永远落后、版本号非正式、OTA 状态乱。用 `VERSION_DEV=0.1.3` 让本地＝官方当前版，官方发新版即检出。
+  2. **OTA 公钥**：默认 `builtOtaPublicKey` 为空 → 官方更新带签名时 `verifyFile`(ota.go:1166-1177) 走到 `verifyFileSignature` 返回 `(present=true, err="no public key embedded")` → **直接 `signature verification failed`，OTA 中止**（页面提示 "No Embedded Public Key"）。必须内嵌**官方公钥**才能校验官方签名。
+     - 该公钥＝出厂二进制内嵌的那个，可从设备 `/userdata/picokvm/bin/kvm_app.bak`（出厂官方版）提取：
+       `ssh root@<DEVICE_IP> "strings .../kvm_app.bak | grep -E '^[0-9a-f]{64}$'"`（出厂版正好 1 个、自构建 0 个）。公钥是公开信息、可安全内嵌；**不要**改仓库 Makefile 默认（上游故意把 `OTA_PUBLIC_KEY ?=` 留空、由 CI 注入）——只在本地命令行传。
+- **本套改动的预期 OTA 工作流**（官方约半年更一次）：官方发新版 → 在设备页面点 OTA → **刷成官方原版、覆盖掉所有自定义改动**（拆除/fail2ban/USB 全没，这是预期行为）→ `git fetch upstream && merge` 同步官方代码 → 按四篇文档重做第 1-4 步 → 用上面配方重新构建并部署。
 - 另一种官方上传途径（README）：MTP——把 kvm_app 拷进共享 MTP 目录再替换；本机直连场景 SSH/scp 更快。
 - 部署的是哪个分支的产物要心里有数（如 `strip-remote-vpn` 同时含拆除+fail2ban）。
 
