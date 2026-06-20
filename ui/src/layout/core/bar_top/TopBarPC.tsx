@@ -21,6 +21,7 @@ import LogoLuckfox from "@assets/logo-luckfox.png";
 import MacroTopBar from "@/layout/components_side/Macros/MacroTopBar";
 import { dark_bg2_style } from "@/layout/theme_color";
 import { useTheme } from "@/layout/contexts/ThemeContext";
+import BannedIPsButton from "@components/BannedIPsButton";
 
 import SettingsModal from "../../components_setting";
 
@@ -139,6 +140,7 @@ export default function TopBarPC({
               {$at("Terminal")}
             </AntdButton>
 
+            <BannedIPsButton />
 
             <div className="hidden lg:block">
 

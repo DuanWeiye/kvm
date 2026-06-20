@@ -43,7 +43,7 @@ ls ui/src/routes/login-local.tsx                                            # �
 - 模型从「5 次失败→10 分钟翻倍临时封」改为「**2 次失败→永久封（内存态，重启清空）**」。
 - `RateLimitInfo` 用 `Failures int` + `BannedAt time.Time`（非零＝已永封）+ `LastSeen`；删掉旧的 `BlockUntil/PenaltySeconds/BasePenalty`。
 - 常量 `MaxFailures = 2`。
-- **白名单**：`whitelistedNets`＝`127.0.0.0/8`、`::1/128`、`10.0.0.0/8`、`172.16.0.0/12`、`192.168.0.0/16`（**含常见私网网段**）；`isWhitelistedIP()` 用 `net.ParseCIDR`/`IPNet.Contains`。白名单 IP 在 `RecordFailure`/`CheckRateLimit` 里直接放行、永不计数。
+- **白名单**：`whitelistedNets`＝`127.0.0.0/8`、`::1/128`、`10.0.0.0/8`、`172.16.0.0/12`、`192.168.0.0/16`（**含本机内网 192.168.x.x**）；`isWhitelistedIP()` 用 `net.ParseCIDR`/`IPNet.Contains`。白名单 IP 在 `RecordFailure`/`CheckRateLimit` 里直接放行、永不计数。
 - API：
   - `CheckRateLimit(ip string) bool`（**签名简化为返回 bool**：白名单或未封→true）。
   - `RecordFailure(ip)`：非白名单累加，达 2 次置 `BannedAt=now`。
@@ -76,6 +76,14 @@ ls ui/src/routes/login-local.tsx                                            # �
 - `BannedList`：`useEffect` 里用 `api.GET(`${DEVICE_API}/auth/banned`)` 拉取，`setInterval` 每 5 秒刷新，
   渲染「IP — 封禁时间」；空列表显示 `None`。时间用 `toLocaleString("ja-JP",{timeZone:"Asia/Tokyo"})` 按 JST 展示。
 - `react` import 加 `useEffect`；`api`、`DEVICE_API` 该文件已 import。
+
+### 3.1 登录后操作页也能看封禁列表（2026-06-20 补）
+需求：登录进入操作页后，也能随时查看被封 IP，而不必登出回登录页。
+- 新增自包含组件 `ui/src/components/BannedIPsButton.tsx`：一个顶栏按钮（`antd` `Button type="text"` + `react-icons/lu` 的 `LuBan` 图标，文字 "Banned IPs"），点击弹出**页面内 modal**（用 Tailwind + 项目 `Card`，浅/深色自适配，非 antd Modal 以免主题不一致）。modal 内列「IP — 封禁时间(JST)」，空列表 `None`；**仅弹窗打开时**每 5 秒拉一次 `/auth/banned`，关闭即停（不打开不轮询）。复用同一公开端点，登录态直接可读、无需新后端。
+- 挂载点：**操作页顶栏** `ui/src/layout/core/bar_top/TopBarPC.tsx`，放在 Terminal 按钮之后（`import BannedIPsButton from "@components/BannedIPsButton"` + `<BannedIPsButton />`）。
+  ⚠️ **别加到 `ui/src/components/Header/Header.tsx`（DashboardNavbar）**——那个只用于登录/改密页（`isLoggedIn={false}`），操作页根本不渲染它（操作页顶栏走 `bar_top/`）。踩过这个坑。
+- modal 遮罩层加 `onKeyDown/onKeyUp` 的 `stopPropagation`，避免键盘事件透传到被控主机。
+- 「弹出新窗口」做成页面内 modal 而非浏览器独立窗口：不受弹窗拦截、深色统一、体验更好。
 
 ---
 
@@ -117,3 +125,4 @@ git fetch upstream && git checkout luckfox && git merge upstream/luckfox   # 同
 ## 7. 首次实施改动清单（参照）
 `ratelimit.go`(重写) + `ratelimit_test.go`(新增) + `web.go`(2 调用点改文案/403 + 公开端点与 handler) +
 `ui/src/routes/login-local.tsx`(BannedList 组件)。验证：单测 4/4 通过，交叉编译/前端/`make build_dev` 均通过。
+（2026-06-20 增补操作页查看：`ui/src/components/BannedIPsButton.tsx`(新增) + `ui/src/layout/core/bar_top/TopBarPC.tsx`(挂载)。见 §3.1。）
