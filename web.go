@@ -3,6 +3,7 @@ package kvm
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -85,7 +86,9 @@ func setupRouter() *gin.Engine {
 	))
 	staticFS, _ := fs.Sub(staticFiles, "static")
 
-	r.Any("/debug/pprof/*any", gin.WrapH(http.DefaultServeMux))
+	// 注意：pprof 只通过下方鉴权后的 /developer/pprof 暴露。
+	// 切勿用 r.Any("/debug/pprof/*any", ...) 把 net/http/pprof 挂到根路由——
+	// 那会在公网无鉴权暴露 profile(可被 30s CPU profile 打 DoS)、heap(可能泄露内存中的令牌/口令哈希)等。
 
 	// Add a custom middleware to set cache headers for images
 	// This is crucial for optimizing the initial welcome screen load time
@@ -107,6 +110,17 @@ func setupRouter() *gin.Engine {
 		c.Next()
 	})
 
+	// 安全响应头：防 MIME 嗅探、防点击劫持；HTTPS 连接下启用 HSTS。
+	r.Use(func(c *gin.Context) {
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("X-Frame-Options", "SAMEORIGIN")
+		c.Header("Referrer-Policy", "no-referrer")
+		if c.Request.TLS != nil {
+			c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
+		c.Next()
+	})
+
 	r.StaticFS("/static", http.FS(staticFS))
 	r.POST("/auth/login-local", handleLogin)
 	// 公开的封禁 IP 列表（登录页展示用，无需登录）
@@ -121,8 +135,8 @@ func setupRouter() *gin.Engine {
 	// We use this to setup the device in the welcome page
 	r.POST("/device/setup", handleSetup)
 
-	// A Prometheus metrics endpoint.
-	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	// A Prometheus metrics endpoint. 仅限回环/私网访问，避免公网泄露内部指标。
+	r.GET("/metrics", privateIPOnly(), gin.WrapH(promhttp.Handler()))
 
 	// Developer mode protected routes
 	developerModeRouter := r.Group("/developer/")
@@ -259,9 +273,9 @@ func handleLocalWebRTCSignal(c *gin.Context) {
 
 	scopedLogger.Info().Msg("new websocket connection established")
 
-	// Create WebSocket options with InsecureSkipVerify to bypass origin check
+	// 仅允许同源握手（Origin 主机须与 Host 一致），防止跨站 WebSocket 劫持（CSWSH）。
+	// coder/websocket 默认即做同源校验——不设 InsecureSkipVerify 即生效。
 	wsOptions := &websocket.AcceptOptions{
-		InsecureSkipVerify: true, // Allow connections from any origin
 		OnPingReceived: func(ctx context.Context, payload []byte) bool {
 			scopedLogger.Debug().Bytes("payload", payload).Msg("ping frame received")
 
@@ -476,7 +490,7 @@ func handleLogin(c *gin.Context) {
 	config.LocalAuthToken = uuid.New().String()
 
 	// Set the cookie (Session cookie, expires on browser close)
-	c.SetCookie("authToken", config.LocalAuthToken, 0, "/", "", false, true)
+	setAuthCookie(c, config.LocalAuthToken, 0)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Login successful"})
 }
@@ -494,7 +508,7 @@ func handleLogout(c *gin.Context) {
 	}
 
 	// Clear the auth cookie
-	c.SetCookie("authToken", "", -1, "/", "", false, true)
+	setAuthCookie(c, "", -1)
 	c.JSON(http.StatusOK, gin.H{"message": "Logout successful"})
 }
 
@@ -506,7 +520,8 @@ func protectedMiddleware() gin.HandlerFunc {
 		}
 
 		authToken, err := c.Cookie("authToken")
-		if err != nil || authToken != config.LocalAuthToken || authToken == "" {
+		// 常量时间比较，避免基于响应耗时的令牌逐字节猜测。
+		if err != nil || authToken == "" || subtle.ConstantTimeCompare([]byte(authToken), []byte(config.LocalAuthToken)) != 1 {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 			c.Abort()
 			return
@@ -514,6 +529,25 @@ func protectedMiddleware() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+// privateIPOnly 仅允许来自回环/私网的来源访问（复用 fail2ban 的白名单网段）。
+// 用于 /metrics 等内部端点：公网访问返回 404（不暴露端点存在）。
+func privateIPOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !isWhitelistedIP(c.ClientIP()) {
+			c.AbortWithStatus(http.StatusNotFound)
+			return
+		}
+		c.Next()
+	}
+}
+
+// setAuthCookie 统一签发/清除 authToken：HttpOnly + SameSite=Strict + 仅 HTTPS 连接时置 Secure。
+// SameSite=Strict 同时挡住跨站 CSRF 与跨站 WebSocket 劫持时的 Cookie 携带。
+func setAuthCookie(c *gin.Context, value string, maxAge int) {
+	c.SetSameSite(http.SameSiteStrictMode)
+	c.SetCookie("authToken", value, maxAge, "/", "", c.Request.TLS != nil, true)
 }
 
 func sendErrorJsonThenAbort(c *gin.Context, status int, message string) {
@@ -629,7 +663,7 @@ func handleCreatePassword(c *gin.Context) {
 	}
 
 	// Set the cookie (Session cookie, expires on browser close)
-	c.SetCookie("authToken", config.LocalAuthToken, 0, "/", "", false, true)
+	setAuthCookie(c, config.LocalAuthToken, 0)
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Password set successfully"})
 }
@@ -672,7 +706,7 @@ func handleUpdatePassword(c *gin.Context) {
 	}
 
 	// Set the cookie (Session cookie, expires on browser close)
-	c.SetCookie("authToken", config.LocalAuthToken, 0, "/", "", false, true)
+	setAuthCookie(c, config.LocalAuthToken, 0)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Password updated successfully"})
 }
@@ -708,7 +742,7 @@ func handleDeletePassword(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("authToken", "", -1, "/", "", false, true)
+	setAuthCookie(c, "", -1)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Password disabled successfully"})
 }
@@ -773,7 +807,7 @@ func handleSetup(c *gin.Context) {
 		config.LocalAuthToken = uuid.New().String()
 
 		// Set the cookie (Session cookie, expires on browser close)
-		c.SetCookie("authToken", config.LocalAuthToken, 0, "/", "", false, true)
+		setAuthCookie(c, config.LocalAuthToken, 0)
 	} else {
 		// For noPassword mode, ensure the password field is empty
 		config.HashedPassword = ""
@@ -801,7 +835,8 @@ func handleRpcRequest(c *gin.Context) {
 		sessionID, err = c.Cookie("httpSessionId")
 		if err != nil || sessionID == "" {
 			sessionID = uuid.New().String()
-			c.SetCookie("httpSessionId", sessionID, 7*24*60*60, "/", "", false, false)
+			c.SetSameSite(http.SameSiteStrictMode)
+			c.SetCookie("httpSessionId", sessionID, 7*24*60*60, "/", "", c.Request.TLS != nil, true)
 		}
 	}
 

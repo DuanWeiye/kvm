@@ -3,6 +3,7 @@
 > 适用工程：`~/Documents/picokvm`（fork 自 `LuckfoxTECH/kvm`，JetKVM 二次开发，Go 后端 + React/Vite 前端，详见记忆 `picokvm-build-env`）。
 > 目标：把 **TailScale / ZeroTier / WireGuard / EasyTier / Vnt / Cloudflare(Tunnel)** 等远程组网/穿透后端干净拆掉，
 > **保留** WebRTC 本地直连、FRP(frpc) 内网穿透。
+> **本文是改动流程的「第二步」**（第一步＝安全加固 [PICOKVM_SECURITY_HARDENING.md](PICOKVM_SECURITY_HARDENING.md)，每次同步上游后最先做）。
 > 用途：官方源更新后，`git fetch upstream && merge` 同步最新代码，再用本文方法快速重新拆除。
 > 首次实施：2026-06-20，分支 `strip-remote-vpn`（参照实现）。
 

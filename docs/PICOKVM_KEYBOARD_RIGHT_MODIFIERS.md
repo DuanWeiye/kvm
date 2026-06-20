@@ -1,9 +1,9 @@
 # Luckfox PicoKVM —— 右侧 Ctrl/Shift 等修饰键透传修复（前端键盘）
 
 > 适用工程：`~/Documents/picokvm`（见记忆 `picokvm-build-env`）。
-> **本文是改动流程的「第四步」**：第一步＝拆远程组网 [PICOKVM_STRIP_REMOTE_NET.md](PICOKVM_STRIP_REMOTE_NET.md)；
-> 第二步＝登录 fail2ban [PICOKVM_FAIL2BAN_LOGIN.md](PICOKVM_FAIL2BAN_LOGIN.md)；第三步＝USB 改造 [PICOKVM_USB_STORAGE.md](PICOKVM_USB_STORAGE.md)；
-> 第四步＝本文（前端键盘右修饰键）；第五步/最后一步＝部署 [PICOKVM_DEPLOY_DEVICE.md](PICOKVM_DEPLOY_DEVICE.md)。
+> **本文是改动流程的「第五步」**：第一步＝安全加固 [PICOKVM_SECURITY_HARDENING.md](PICOKVM_SECURITY_HARDENING.md)；第二步＝拆远程组网 [PICOKVM_STRIP_REMOTE_NET.md](PICOKVM_STRIP_REMOTE_NET.md)；
+> 第三步＝登录 fail2ban [PICOKVM_FAIL2BAN_LOGIN.md](PICOKVM_FAIL2BAN_LOGIN.md)；第四步＝USB 改造 [PICOKVM_USB_STORAGE.md](PICOKVM_USB_STORAGE.md)；
+> 第五步＝本文（前端键盘右修饰键）；第六步/最后一步＝部署 [PICOKVM_DEPLOY_DEVICE.md](PICOKVM_DEPLOY_DEVICE.md)。
 > 首次实施并验证通过：2026-06-20。
 
 ---
@@ -101,7 +101,7 @@ cd ~/Documents/picokvm && export PATH="$HOME/sdk/go1.25.5/bin:$PATH"
 make build_dev VERSION_DEV=0.1.3 \
      OTA_PUBLIC_KEY=4d78341c5c66fd5c09635d45ad3aa0ae7ab131f9e945868ec9726fbc1367a452
 ```
-按第五步 [PICOKVM_DEPLOY_DEVICE.md](PICOKVM_DEPLOY_DEVICE.md) 部署。验证：刷新被控页面清掉手动 console 监听后，按右 Ctrl/右 Shift 能透传；底栏统一显示 `Ctrl`/`Shift`。
+按第六步 [PICOKVM_DEPLOY_DEVICE.md](PICOKVM_DEPLOY_DEVICE.md) 部署。验证：刷新被控页面清掉手动 console 监听后，按右 Ctrl/右 Shift 能透传；底栏统一显示 `Ctrl`/`Shift`。
 
 > 兼容性：`location===2` 能正确报右的键盘会被识别成右修饰位；上报 `location=0` 的（如本次实测键盘）按左处理，功能等价。
 

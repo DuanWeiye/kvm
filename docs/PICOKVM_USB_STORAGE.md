@@ -1,9 +1,9 @@
 # Luckfox PicoKVM —— USB 虚拟介质：TF 卡镜像可写 + 默认不自动挂载
 
 > 适用工程：`~/Documents/picokvm`（见记忆 `picokvm-build-env`）。
-> **本文是改动方法论的「第三步」**（部署已调整到本步之后）：
-> ①拆远程组网 [PICOKVM_STRIP_REMOTE_NET.md](PICOKVM_STRIP_REMOTE_NET.md)；②登录 fail2ban [PICOKVM_FAIL2BAN_LOGIN.md](PICOKVM_FAIL2BAN_LOGIN.md)；
-> ③（本文）USB 改造；④部署到实机 [PICOKVM_DEPLOY_DEVICE.md](PICOKVM_DEPLOY_DEVICE.md)＝最后一步。
+> **本文是改动方法论的「第四步」**：
+> ①安全加固 [PICOKVM_SECURITY_HARDENING.md](PICOKVM_SECURITY_HARDENING.md)；②拆远程组网 [PICOKVM_STRIP_REMOTE_NET.md](PICOKVM_STRIP_REMOTE_NET.md)；③登录 fail2ban [PICOKVM_FAIL2BAN_LOGIN.md](PICOKVM_FAIL2BAN_LOGIN.md)；
+> ④（本文）USB 改造；⑤键盘 [PICOKVM_KEYBOARD_RIGHT_MODIFIERS.md](PICOKVM_KEYBOARD_RIGHT_MODIFIERS.md)；⑥部署到实机 [PICOKVM_DEPLOY_DEVICE.md](PICOKVM_DEPLOY_DEVICE.md)＝最后一步。
 > 目标：让 PicoKVM 呈给**目标机**的虚拟 U 盘 —— ①**TF 卡上的镜像可写**（默认全只读）；②**开机不自动挂载** system_info.img。
 > 首次实施：2026-06-20，分支 `strip-remote-vpn`，部署产物 sha256 `aa1391fa…`。
 

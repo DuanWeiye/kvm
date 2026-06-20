@@ -2,6 +2,7 @@ package kvm
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
 	"net/http"
@@ -24,18 +25,17 @@ func StartMCP(port int, stdio bool) {
 	}
 
 	// SSE mode
-	addr := fmt.Sprintf(":%d", port)
+	// 仅绑定回环：MCP 可驱动被控机键鼠/截屏，不对外/局域网开放
+	//（如需局域网调用改回 ":%d" 并确保 APIKey 已配且端口未被转发）。
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	sseServer := server.NewSSEServer(s)
 
 	mux := http.NewServeMux()
 	mux.Handle("/sse", sseServer.SSEHandler())
 	mux.Handle("/message", sseServer.MessageHandler())
 
-	var handler http.Handler = mux
-	if config.APIKey != "" {
-		handler = withAPIKeyAuth(handler, config.APIKey)
-	}
-	handler = withCORS(handler)
+	// 始终挂鉴权：即便 APIKey 为空，withAPIKeyAuth 也会拒绝非本机请求（绝不裸奔）。
+	handler := withCORS(withAPIKeyAuth(mux, config.APIKey))
 
 	logger.Info().Str("addr", addr).Msg("Starting MCP SSE server")
 	if err := http.ListenAndServe(addr, handler); err != nil {
@@ -60,20 +60,27 @@ func withCORS(next http.Handler) http.Handler {
 
 func withAPIKeyAuth(next http.Handler, expectedKey string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip auth for localhost
-		if strings.HasPrefix(r.RemoteAddr, "127.0.0.1:") || 
-		   strings.HasPrefix(r.RemoteAddr, "[::1]:") {
+		// 本机请求免鉴权（RemoteAddr 为真实 TCP 对端，不可经 XFF 伪造）。
+		if strings.HasPrefix(r.RemoteAddr, "127.0.0.1:") ||
+			strings.HasPrefix(r.RemoteAddr, "[::1]:") {
 			next.ServeHTTP(w, r)
 			return
 		}
-		
+
+		// 未配置 API key 时一律拒绝非本机请求（绝不裸奔）。
+		if expectedKey == "" {
+			http.Error(w, `{"error":"API key not configured"}`, http.StatusUnauthorized)
+			return
+		}
+
 		auth := r.Header.Get("Authorization")
 		var key string
 		if _, err := fmt.Sscanf(auth, "Bearer %s", &key); err != nil {
 			http.Error(w, `{"error":"missing or invalid authorization"}`, http.StatusUnauthorized)
 			return
 		}
-		if !strings.EqualFold(key, expectedKey) {
+		// 常量时间比较；不用 EqualFold（大小写不敏感会削弱密钥强度）。
+		if subtle.ConstantTimeCompare([]byte(key), []byte(expectedKey)) != 1 {
 			http.Error(w, `{"error":"invalid api key"}`, http.StatusUnauthorized)
 			return
 		}

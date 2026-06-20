@@ -2,7 +2,7 @@
 
 > 适用工程：`~/Documents/picokvm`（fork 自 `LuckfoxTECH/kvm`，详见记忆 `picokvm-build-env` 与
 > 同目录 [PICOKVM_STRIP_REMOTE_NET.md](PICOKVM_STRIP_REMOTE_NET.md)）。
-> **本文是「同步官方新代码后的第二步」**：第一步＝按 STRIP_REMOTE_NET 拆远程组网组件；第二步＝按本文重做 fail2ban。
+> **本文是「同步官方新代码后的第三步」**：第一步＝安全加固 [PICOKVM_SECURITY_HARDENING.md](PICOKVM_SECURITY_HARDENING.md)；第二步＝拆远程组网 STRIP_REMOTE_NET；第三步＝按本文重做 fail2ban。
 > 首次实施：2026-06-20（与拆除工作同在分支 `strip-remote-vpn`，未 commit）。
 
 ---
@@ -112,12 +112,13 @@ ls ui/src/routes/login-local.tsx                                            # �
 
 ---
 
-## 6. 同步上游后复用流程（本文＝第二步）
+## 6. 同步上游后复用流程（本文＝第三步）
 ```bash
 cd ~/Documents/picokvm
 git fetch upstream && git checkout luckfox && git merge upstream/luckfox   # 同步官方
-# 第一步：按 PICOKVM_STRIP_REMOTE_NET.md 拆远程组网组件
-# 第二步：按本文 §1 grep 确认 → §2 后端 → §3 前端 → §4 验证
+# 第一步：按 PICOKVM_SECURITY_HARDENING.md 安全加固复查
+# 第二步：按 PICOKVM_STRIP_REMOTE_NET.md 拆远程组网组件
+# 第三步：按本文 §1 grep 确认 → §2 后端 → §3 前端 → §4 验证
 ```
 官方若重构了 `ratelimit.go`/登录中间件/登录页，按 §1 的 grep 重新定位锚点再套用；
 若官方新增了别的登录入口，记得确认它是否也走 `CheckRateLimit`（不走则需补挂）。

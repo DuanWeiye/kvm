@@ -1,6 +1,7 @@
 package kvm
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"net/http"
 	"strings"
@@ -46,7 +47,8 @@ func StartAPIServer(port int) {
 		api.GET("/video/state", handleAPIVideoState)
 	}
 
-	addr := fmt.Sprintf(":%d", port)
+	// 仅绑定回环：该自动化 API 不对外/局域网开放（如需局域网调用改回 ":%d" 并确保 APIKey 已配且端口未被转发）。
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	logger.Info().Str("addr", addr).Msg("Starting LAN API server")
 	if err := r.Run(addr); err != nil {
 		logger.Error().Err(err).Msg("LAN API server failed")
@@ -96,7 +98,8 @@ func apiKeyAuthMiddleware(expectedKey string) gin.HandlerFunc {
 			c.AbortWithStatusJSON(401, gin.H{"error": "missing or invalid authorization"})
 			return
 		}
-		if !strings.EqualFold(key, expectedKey) {
+		// 常量时间比较；不用 EqualFold（大小写不敏感会削弱密钥强度）。
+		if subtle.ConstantTimeCompare([]byte(key), []byte(expectedKey)) != 1 {
 			c.AbortWithStatusJSON(401, gin.H{"error": "invalid api key"})
 			return
 		}

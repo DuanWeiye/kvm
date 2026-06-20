@@ -1,8 +1,8 @@
 # Luckfox PicoKVM —— 把编译好的 kvm_app 替换进实机（部署/回滚）
 
 > 适用工程：`~/Documents/picokvm`（见记忆 `picokvm-build-env`）。
-> **本文是改动流程的「最后一步（第五步）」**：第一步＝拆远程组网 [PICOKVM_STRIP_REMOTE_NET.md](PICOKVM_STRIP_REMOTE_NET.md)；
-> 第二步＝登录 fail2ban [PICOKVM_FAIL2BAN_LOGIN.md](PICOKVM_FAIL2BAN_LOGIN.md)；第三步＝USB 改造 [PICOKVM_USB_STORAGE.md](PICOKVM_USB_STORAGE.md)；第四步＝键盘右修饰键 [PICOKVM_KEYBOARD_RIGHT_MODIFIERS.md](PICOKVM_KEYBOARD_RIGHT_MODIFIERS.md)；第五步＝按本文把产物部署到实机验证。
+> **本文是改动流程的「最后一步（第六步）」**：第一步＝安全加固 [PICOKVM_SECURITY_HARDENING.md](PICOKVM_SECURITY_HARDENING.md)；第二步＝拆远程组网 [PICOKVM_STRIP_REMOTE_NET.md](PICOKVM_STRIP_REMOTE_NET.md)；
+> 第三步＝登录 fail2ban [PICOKVM_FAIL2BAN_LOGIN.md](PICOKVM_FAIL2BAN_LOGIN.md)；第四步＝USB 改造 [PICOKVM_USB_STORAGE.md](PICOKVM_USB_STORAGE.md)；第五步＝键盘右修饰键 [PICOKVM_KEYBOARD_RIGHT_MODIFIERS.md](PICOKVM_KEYBOARD_RIGHT_MODIFIERS.md)；第六步＝按本文把产物部署到实机验证。
 > 首次实施并验证通过：2026-06-20。
 
 ---
@@ -94,16 +94,17 @@ ssh root@<DEVICE_IP> 'mv -f /userdata/picokvm/bin/kvm_app.bak /userdata/picokvm/
   2. **OTA 公钥**：默认 `builtOtaPublicKey` 为空 → 官方更新带签名时 `verifyFile`(ota.go:1166-1177) 走到 `verifyFileSignature` 返回 `(present=true, err="no public key embedded")` → **直接 `signature verification failed`，OTA 中止**（页面提示 "No Embedded Public Key"）。必须内嵌**官方公钥**才能校验官方签名。
      - 该公钥＝出厂二进制内嵌的那个，可从设备 `/userdata/picokvm/bin/kvm_app.bak`（出厂官方版）提取：
        `ssh root@<DEVICE_IP> "strings .../kvm_app.bak | grep -E '^[0-9a-f]{64}$'"`（出厂版正好 1 个、自构建 0 个）。公钥是公开信息、可安全内嵌；**不要**改仓库 Makefile 默认（上游故意把 `OTA_PUBLIC_KEY ?=` 留空、由 CI 注入）——只在本地命令行传。
-- **本套改动的预期 OTA 工作流**（官方约半年更一次）：官方发新版 → 在设备页面点 OTA → **刷成官方原版、覆盖掉所有自定义改动**（拆除/fail2ban/USB 全没，这是预期行为）→ `git fetch upstream && merge` 同步官方代码 → 按四篇文档重做第 1-4 步 → 用上面配方重新构建并部署。
+- **本套改动的预期 OTA 工作流**（官方约半年更一次）：官方发新版 → 在设备页面点 OTA → **刷成官方原版、覆盖掉所有自定义改动**（安全加固/拆除/fail2ban/USB/键盘 全没，这是预期行为）→ `git fetch upstream && merge` 同步官方代码 → 按前五篇文档重做第 1-5 步（**安全加固最先**）→ 用上面配方重新构建并部署。
 - 另一种官方上传途径（README）：MTP——把 kvm_app 拷进共享 MTP 目录再替换；本机直连场景 SSH/scp 更快。
 - 部署的是哪个分支的产物要心里有数（如 `strip-remote-vpn` 同时含拆除+fail2ban）。
 
 ## 6. 同步上游后的完整流程串联
 ```text
-git fetch upstream && merge   →  第一步 PICOKVM_STRIP_REMOTE_NET（拆远程组网）
-                               →  第二步 PICOKVM_FAIL2BAN_LOGIN（登录 fail2ban）
-                               →  第三步 PICOKVM_USB_STORAGE（USB 虚拟介质改造）
-                               →  第四步 PICOKVM_KEYBOARD_RIGHT_MODIFIERS（右 Ctrl/Shift 透传）
+git fetch upstream && merge   →  第一步 PICOKVM_SECURITY_HARDENING（安全加固复查）
+                               →  第二步 PICOKVM_STRIP_REMOTE_NET（拆远程组网）
+                               →  第三步 PICOKVM_FAIL2BAN_LOGIN（登录 fail2ban）
+                               →  第四步 PICOKVM_USB_STORAGE（USB 虚拟介质改造）
+                               →  第五步 PICOKVM_KEYBOARD_RIGHT_MODIFIERS（右 Ctrl/Shift 透传）
                                →  make build_dev
-                               →  第五步（本文）部署到 <DEVICE_IP> + 验证
+                               →  第六步（本文）部署到 <DEVICE_IP> + 验证
 ```

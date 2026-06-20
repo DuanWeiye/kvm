@@ -107,9 +107,8 @@ func handleSerialWS(c *gin.Context) {
 		Str("source", source).
 		Logger()
 
-	wsCon, err := websocket.Accept(c.Writer, c.Request, &websocket.AcceptOptions{
-		InsecureSkipVerify: true,
-	})
+	// 仅允许同源握手，防跨站 WebSocket 劫持（CSWSH）。不设 InsecureSkipVerify → coder/websocket 默认做同源校验。
+	wsCon, err := websocket.Accept(c.Writer, c.Request, nil)
 	if err != nil {
 		c.Status(500)
 		return
