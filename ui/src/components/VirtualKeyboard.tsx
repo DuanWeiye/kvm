@@ -178,7 +178,7 @@ function KeyboardWrapper() {
       const keyHasShiftModifier = key.includes("(");
 
       // Check if this is a modifier key press
-      const isModifierKey = key === "ControlLeft" || key === "AltLeft" || key === "MetaLeft" || 
+      const isModifierKey = key === "ControlLeft" || key === "ControlRight" || key === "AltLeft" || key === "MetaLeft" ||
                            key === "AltRight" || key === "MetaRight" || isKeyShift;
 
       // Handle toggle of layout for shift or caps lock
@@ -187,13 +187,14 @@ function KeyboardWrapper() {
       };
 
       // Handle modifier key press
-      if (key === "ControlLeft") {
+      if (key === "ControlLeft" || key === "ControlRight") {
         if (modifierLockMode) {
           // Lock mode: toggle lock state
           setLockedModifiers(prev => ({ ...prev, ctrl: !prev.ctrl }));
         } else {
           // Direct trigger mode: send key press and release immediately
-          sendKeyboardEvent([], [modifiers["ControlLeft"]]);
+          // 直接触发模式：按下哪一侧 Ctrl 就透传哪一侧（左/右），与 Alt/Meta 保持一致
+          sendKeyboardEvent([], [modifiers[key]]);
           setTimeout(resetKeyboardState, 100);
         }
         return;
@@ -227,7 +228,9 @@ function KeyboardWrapper() {
             toggleLayout();
           }
         } else {
-          sendKeyboardEvent([], [modifiers["ShiftLeft"]]);
+          // 直接触发模式：右 Shift 透传右 Shift，左 Shift / {shift} 透传左 Shift
+          const shiftSide = key === "ShiftRight" ? "ShiftRight" : "ShiftLeft";
+          sendKeyboardEvent([], [modifiers[shiftSide]]);
           setTimeout(resetKeyboardState, 100);
         }
         return;
@@ -330,7 +333,7 @@ function KeyboardWrapper() {
   const setVirtualKeyboard = useHidStore(state => state.setVirtualKeyboardEnabled);
 
   const modifierLockButtons = [
-    lockedModifiers.ctrl ? "ControlLeft" : "",
+    lockedModifiers.ctrl ? "ControlLeft ControlRight" : "",
     lockedModifiers.alt ? "AltLeft AltRight" : "",
     lockedModifiers.meta ? "MetaLeft MetaRight" : "",
     lockedModifiers.shift ? "ShiftLeft ShiftRight" : "",

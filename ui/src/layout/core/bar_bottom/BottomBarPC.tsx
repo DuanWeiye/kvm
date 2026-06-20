@@ -363,6 +363,15 @@ interface PressedKeysDisplayProps {
   $at: any;
 }
 
+// 修饰键显示不区分左右：右 Shift 等在部分键盘上 e.code 异常、无法判定左右，
+// 统一显示为 Ctrl/Shift/Alt/Meta，避免出现「按右 Shift 却显示 ShiftLeft」的困惑。
+const modifierLabelNoSide: Record<string, string> = {
+  ControlLeft: "Ctrl", ControlRight: "Ctrl",
+  ShiftLeft: "Shift", ShiftRight: "Shift",
+  AltLeft: "Alt", AltRight: "Alt",
+  MetaLeft: "Meta", MetaRight: "Meta",
+};
+
 function PressedKeysDisplay({ activeKeys, activeModifiers, $at }: PressedKeysDisplayProps) {
   return (
     <div className="flex items-center gap-x-1" style={{ position: "relative", top: "1px", fontSize: 12}}>
@@ -370,7 +379,10 @@ function PressedKeysDisplay({ activeKeys, activeModifiers, $at }: PressedKeysDis
       <h2>
         {[
           ...activeKeys.map(x => Object.entries(keys).filter(y => y[1] === x)[0][0]),
-          activeModifiers.map(x => Object.entries(modifiers).filter(y => y[1] === x)[0][0]),
+          activeModifiers.map(x => {
+            const name = Object.entries(modifiers).filter(y => y[1] === x)[0][0];
+            return modifierLabelNoSide[name] || name;
+          }),
         ].join(", ")}
       </h2>
     </div>

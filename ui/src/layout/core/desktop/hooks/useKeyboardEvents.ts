@@ -6,6 +6,20 @@ import { keys, modifiers } from "@/keyboardMappings";
 import { keyboards } from "@/keyboardLayouts";
 import { eventMatchesShortcut } from "@/utils/shortcuts";
 
+// 用 e.key + e.location 兜底识别修饰键：部分键盘/系统对右侧修饰键上报异常的 e.code
+//（实测某键盘右 Shift 给出空 code、location=0），导致按 e.code 查不到对应修饰位。
+// location: 2=右侧；其余值（含异常的 0）按左侧处理——功能上 Shift/Ctrl 即 Shift/Ctrl。
+const modifierFromKeyEvent = (key: string, location: number): number | undefined => {
+  switch (key) {
+    case "Control": return location === 2 ? modifiers["ControlRight"] : modifiers["ControlLeft"];
+    case "Shift":   return location === 2 ? modifiers["ShiftRight"] : modifiers["ShiftLeft"];
+    case "Alt":     return location === 2 ? modifiers["AltRight"] : modifiers["AltLeft"];
+    case "Meta":
+    case "OS":      return location === 2 ? modifiers["MetaRight"] : modifiers["MetaLeft"];
+    default:        return undefined;
+  }
+};
+
 export const useKeyboardEvents = (
   pasteCaptureRef?: React.RefObject<HTMLTextAreaElement>,
   isReinitializingGadget?: boolean
@@ -89,8 +103,22 @@ export const useKeyboardEvents = (
 
     code = remapCode(code, key);
 
+    // 本次按下的修饰位：先按 e.code 查表；查不到（既非已知按键也非已知修饰键）再用
+    // e.key + e.location 兜底，兼容右 Shift/右 Ctrl 等上报异常 e.code 的键盘。
+    let pressedModifier: number | undefined = modifiers[code];
+    if (pressedModifier === undefined && keys[code] === undefined) {
+      pressedModifier = modifierFromKeyEvent(key, e.location);
+    }
+
     const newKeys = [...prev.activeKeys, keys[code]].filter(Boolean);
-    const newModifiers = handleModifierKeys(e, [...prev.activeModifiers, modifiers[code]]);
+    const baseModifiers = pressedModifier !== undefined
+      ? [...prev.activeModifiers, pressedModifier]
+      : prev.activeModifiers;
+    const newModifiers = handleModifierKeys(e, baseModifiers);
+    // 刚按下的修饰键强制保留，避免对应 ctrlKey/shiftKey 标志滞后时被 handleModifierKeys 误删。
+    if (pressedModifier !== undefined && !newModifiers.includes(pressedModifier)) {
+      newModifiers.push(pressedModifier);
+    }
 
     if (e.metaKey) {
       setTimeout(() => {
@@ -116,10 +144,16 @@ export const useKeyboardEvents = (
       setIsScrollLockActive(e.getModifierState("ScrollLock"));
     }
 
+    // 释放的修饰位：与按下同样的兜底逻辑，确保 e.code 异常的右修饰键也能被正确移除（不残留）。
+    let releasedModifier: number | undefined = modifiers[code];
+    if (releasedModifier === undefined && keys[code] === undefined) {
+      releasedModifier = modifierFromKeyEvent(key, e.location);
+    }
+
     const newKeys = prev.activeKeys.filter(k => k !== keys[code]).filter(Boolean);
     const newModifiers = handleModifierKeys(
       e,
-      prev.activeModifiers.filter(k => k !== modifiers[code]),
+      prev.activeModifiers.filter(k => k !== releasedModifier),
     );
 
     sendKeyboardEvent([...new Set(newKeys)], [...new Set(newModifiers)]);

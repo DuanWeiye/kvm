@@ -1,8 +1,8 @@
 # Luckfox PicoKVM —— 把编译好的 kvm_app 替换进实机（部署/回滚）
 
 > 适用工程：`~/Documents/picokvm`（见记忆 `picokvm-build-env`）。
-> **本文是改动流程的「最后一步（第四步）」**：第一步＝拆远程组网 [PICOKVM_STRIP_REMOTE_NET.md](PICOKVM_STRIP_REMOTE_NET.md)；
-> 第二步＝登录 fail2ban [PICOKVM_FAIL2BAN_LOGIN.md](PICOKVM_FAIL2BAN_LOGIN.md)；第三步＝USB 改造 [PICOKVM_USB_STORAGE.md](PICOKVM_USB_STORAGE.md)；第四步＝按本文把产物部署到实机验证。
+> **本文是改动流程的「最后一步（第五步）」**：第一步＝拆远程组网 [PICOKVM_STRIP_REMOTE_NET.md](PICOKVM_STRIP_REMOTE_NET.md)；
+> 第二步＝登录 fail2ban [PICOKVM_FAIL2BAN_LOGIN.md](PICOKVM_FAIL2BAN_LOGIN.md)；第三步＝USB 改造 [PICOKVM_USB_STORAGE.md](PICOKVM_USB_STORAGE.md)；第四步＝键盘右修饰键 [PICOKVM_KEYBOARD_RIGHT_MODIFIERS.md](PICOKVM_KEYBOARD_RIGHT_MODIFIERS.md)；第五步＝按本文把产物部署到实机验证。
 > 首次实施并验证通过：2026-06-20。
 
 ---
@@ -103,6 +103,7 @@ ssh root@<DEVICE_IP> 'mv -f /userdata/picokvm/bin/kvm_app.bak /userdata/picokvm/
 git fetch upstream && merge   →  第一步 PICOKVM_STRIP_REMOTE_NET（拆远程组网）
                                →  第二步 PICOKVM_FAIL2BAN_LOGIN（登录 fail2ban）
                                →  第三步 PICOKVM_USB_STORAGE（USB 虚拟介质改造）
+                               →  第四步 PICOKVM_KEYBOARD_RIGHT_MODIFIERS（右 Ctrl/Shift 透传）
                                →  make build_dev
-                               →  第四步（本文）部署到 <DEVICE_IP> + 验证
+                               →  第五步（本文）部署到 <DEVICE_IP> + 验证
 ```
